@@ -804,7 +804,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
             책을 읽는다는 것은 다른 사람의 생각 속에서 나를 발견하는 일이다.
           </p>
           <p className="mt-1 text-sm text-stone-500">
-            p.123 · 오늘 · 화면 글꼴 예시예요.
+            {pageText({ page: 123 })} · 오늘 · 화면 글꼴 예시예요.
           </p>
         </div>
       </Section>
