@@ -1,0 +1,79 @@
+# API 규격 (api-spec.yaml)
+# 작성: AI 초안 / 확인: 개발자(API 동작, 인증, 오류 정책)
+#
+# ※ 현재 북앤펜에는 자체 서버와 API가 없습니다. (모든 기록은 기기의 LocalStorage에만 저장)
+# ※ 아래 paths는 "책 검색 기능(보류)"을 만들 때를 대비한 초안이며, 구현되어 있지 않습니다.
+#   실제로 만들 때는 외부 도서 검색 API의 약관·키 관리 방식을 먼저 정해야 합니다.
+#   (API 키는 브라우저 코드에 넣으면 노출되므로, 서버를 거치는 방식이 필요합니다.)
+#
+# 현재 앱이 외부와 통신하는 곳(자체 API 아님):
+#   - Tesseract.js 언어 데이터 내려받기 (첫 글자 인식 때 1회, 이후 브라우저 캐시)
+#   - Google Fonts 글꼴 내려받기 (fonts.googleapis.com)
+
+openapi: 3.0.3
+info:
+  title: 북앤펜 도서 검색 API (초안, 미구현)
+  version: 0.0.1
+  description: 책 등록 시 제목으로 책을 찾아 저자 등을 자동으로 채우기 위한 계획용 규격입니다.
+servers:
+  - url: https://api.example.com   # 자리표시자. 실제 주소 아님
+paths:
+  /books/search:
+    get:
+      summary: 제목으로 책 검색
+      x-status: planned
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: 검색어(제목). 1자 이상 100자 이하.
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 20, default: 10 }
+      responses:
+        '200':
+          description: 검색 결과 (없으면 빈 배열)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/BookCandidate' }
+        '400':
+          description: 검색어가 없거나 너무 김
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '429':
+          description: 요청이 너무 많음. 잠시 뒤 다시 시도
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+        '502':
+          description: 외부 도서 서비스 오류
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+components:
+  schemas:
+    BookCandidate:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string }
+        author: { type: string }
+        publisher: { type: string }
+        isbn: { type: string }
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: 사용자에게 보여 줄 수 있는 한 문장(예: "잠시 뒤 다시 시도해 주세요.")
+# 인증: 미정. 공개 검색이면 서버에서 키를 보관하고 요청 횟수를 제한하는 방식을 권장.
+# 오류 정책: 화면에는 원인 설명 + 다음 행동만 보여 주고, 내부 오류 문구는 노출하지 않음.

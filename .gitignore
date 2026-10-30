@@ -1,0 +1,42 @@
+node_modules
+dist
+.DS_Store
+*.log
+
+# 파이썬 캐시
+__pycache__/
+*.pyc
+
+# 보안 관련 (키·인증서·환경 변수)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+*.secret
+.npmrc
+
+# 테스트 파일·테스트 데이터
+test/
+tests/
+__tests__/
+*.test.js
+*.test.jsx
+*.spec.js
+*.spec.jsx
+coverage/
+
+# 내 기록이 들어 있는 백업 파일과 시험용 사진
+*backup*.json
+*.jpg
+*.jpeg
+*.png
+# 앱 아이콘·로고처럼 올려야 하는 이미지는 public 폴더에 두면 제외되지 않아요
+!public/**/*.jpg
+!public/**/*.jpeg
+!public/**/*.png
+
+# 테스트 명세 문서(테스트 관련 파일은 올리지 않기로 함)
+docs/test-spec.md

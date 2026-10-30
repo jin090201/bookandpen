@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 색 기본값(라이트). 설정의 색 테마·포인트 색은 main.jsx의 applySettings가 이 값을 바꿔 줘요 */
+:root {
+  --c-white: 255 255 255;
+  --c-stone-50: 250 250 249;
+  --c-stone-100: 245 245 244;
+  --c-stone-200: 231 229 228;
+  --c-stone-300: 214 211 209;
+  --c-stone-400: 168 162 158;
+  --c-stone-500: 120 113 108;
+  --c-stone-600: 87 83 78;
+  --c-stone-700: 68 64 60;
+  --c-stone-800: 41 37 36;
+  --c-stone-900: 28 25 23;
+  --accent: 41 37 36;
+  --dot: 87 83 78;
+  --on-accent: 255 255 255;
+}
+
+html {
+  font-size: 125%; /* 기본 20px. rem 기준이라 화면 전체 글씨가 함께 커져요 (설정에서 변경) */
+}
+
+html,
+body {
+  background: rgb(var(--c-stone-50));
+  color: rgb(var(--c-stone-800));
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 글꼴 규칙: 제목·필사 본문 = font-body(설정의 '필사 본문 글꼴'), 그 외 = 설정의 '화면 글꼴'.
+   크기 규칙: 제목 text-2xl, 본문 text-base, 보조 text-sm, 메타 text-xs.
+   글꼴·크기 값은 설정 탭에서 바뀌며 main.jsx의 applySettings가 적용합니다. */
+body {
+  font-family: var(--font-ui, 'Noto Sans KR'), -apple-system, BlinkMacSystemFont,
+    'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+}
+
+.font-body {
+  zoom: var(--body-scale, 1); /* 손글씨처럼 작아 보이는 폰트 크기 보정 */
+}
+
+textarea,
+input {
+  font-size: 1rem; /* 기준 글씨와 동일. 16px 이상이라 iOS 입력창 자동 확대 없음 */
+}
