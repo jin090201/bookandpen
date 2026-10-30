@@ -184,8 +184,10 @@ export const countChars = (s) => [...(s || '')].length;
 // ───────────────── 저장 공간·백업 알림 ─────────────────
 const STORAGE_BYTES = 5 * 1024 * 1024; // LocalStorage 약 5MB (브라우저는 글자당 2바이트로 셈)
 const BACKUP_KEY = 'reading-notes:backup:v1'; // 마지막으로 백업을 내려받은 시각
+const REMIND_KEY = 'reading-notes:remind:v1'; // 백업 알림 띠를 닫은 시각
 export const BACKUP_EVENT = 'bookandpen:backup';
 export const BACKUP_REMIND_DAYS = 30;
+export const REMIND_SNOOZE_DAYS = 7;
 export const SPACE_WARN_PCT = 80;
 
 // 이 앱이 쓰고 있는 저장 공간: { bytes, pct }
@@ -220,10 +222,28 @@ export function markBackup() {
   window.dispatchEvent(new Event(BACKUP_EVENT));
 }
 
-// 백업을 권하는 문구 목록 (필요 없으면 빈 배열)
-export function backupReminders(data, lastBackup, usage) {
+export function getRemindClosedAt() {
+  try {
+    return localStorage.getItem(REMIND_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function closeBackupReminder() {
+  try {
+    localStorage.setItem(REMIND_KEY, new Date().toISOString());
+  } catch {
+    /* 저장 실패는 무시 */
+  }
+}
+
+// 백업을 권하는 문구: { backup: 닫으면 7일간 숨기는 문구, space: 항상 보이는 공간 경고 }
+export function backupReminders(data, lastBackup, usage, closedAt) {
   const out = [];
-  if (data.transcriptions.length > 0) {
+  const snoozed =
+    closedAt && Date.now() - new Date(closedAt).getTime() < REMIND_SNOOZE_DAYS * 86400000;
+  if (data.transcriptions.length > 0 && !snoozed) {
     const oldest = data.transcriptions.reduce(
       (min, t) => (t.created_at < min ? t.created_at : min),
       data.transcriptions[0].created_at
@@ -238,10 +258,8 @@ export function backupReminders(data, lastBackup, usage) {
       );
     }
   }
-  if (usage.pct >= SPACE_WARN_PCT) {
-    out.push(`저장 공간을 ${usage.pct}% 사용 중이에요.`);
-  }
-  return out;
+  const space = usage.pct >= SPACE_WARN_PCT ? [`저장 공간을 ${usage.pct}% 사용 중이에요.`] : [];
+  return { backup: out, space };
 }
 
 // ───────────────── 글자 크기·글꼴 설정 ─────────────────
@@ -252,12 +270,12 @@ const SETTINGS_EVENT = 'bookandpen:settings';
 const SANS_FALLBACK =
   "-apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif";
 
-// pct = 화면 기본 글자 크기(html font-size). 보통 = 125% (20px)
+// pct = 화면 기본 글자 크기(html font-size). 작게 16px · 보통 18px · 크게 20px · 아주 크게 22px입니다.
 export const SIZE_OPTIONS = [
-  { id: 'sm', label: '작게', pct: 112.5 },
-  { id: 'md', label: '보통', pct: 125 },
-  { id: 'lg', label: '크게', pct: 137.5 },
-  { id: 'xl', label: '아주 크게', pct: 150 },
+  { id: 'sm', label: '작게', pct: 100 },
+  { id: 'md', label: '보통', pct: 112.5 },
+  { id: 'lg', label: '크게', pct: 125 },
+  { id: 'xl', label: '아주 크게', pct: 137.5 },
 ];
 
 // scale = 폰트마다 달라 보이는 크기를 맞추는 보정값 (손글씨는 작아 보여서 키움)

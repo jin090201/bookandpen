@@ -10,7 +10,7 @@
  │   ├─ components/ .... BookList(책장·즐겨찾기·설정), BookDetail, ScanEditor, CalendarView(독서 달력·내려받기), StatsView(통계),
  │   │                    공통: Pager(목록 나누기), Chip(선택 칩)
  │   └─ lib/ ........... storage(저장·백업·설정·내보내기·종류 거르기·페이지 표기), date(날짜 표기), ocr, postprocess
- ├─ LocalStorage ....... 기록(reading-notes:v1), 설정(reading-notes:settings:v1), 달력 설정(reading-notes:calendar:v1), 마지막 백업 시각(reading-notes:backup:v1)
+ ├─ LocalStorage ....... 기록(reading-notes:v1), 설정(reading-notes:settings:v1), 달력 설정(reading-notes:calendar:v1), 마지막 백업 시각(reading-notes:backup:v1), 알림 띠를 닫은 시각(reading-notes:remind:v1)
  ├─ Tesseract.js ....... 브라우저 안 OCR (kor+eng)
  └─ (외부) 언어 데이터·구글 폰트 내려받기 (인터넷)
 서버 없음 → GitHub Pages가 정적 파일만 제공
@@ -31,7 +31,7 @@
 - 모든 기록은 `App`의 `data` 하나에 두고, 바뀔 때마다 `saveData`로 저장. 저장 실패 시 상단에 경고 표시.
 - 설정은 `useSettings` 훅과 `updateSettings`(저장 + 즉시 적용 + 이벤트 알림)로 화면 간 공유.
 - 삭제 직전의 책·필사를 `undo` 상태에 7초간 보관하고, 되돌릴 때 id 기준으로 합칩니다(그 사이 바뀐 다른 기록은 건드리지 않습니다).
-- 백업 알림은 `backupReminders`가 마지막 백업 후 30일 경과 또는 저장 공간 80% 이상일 때 안내 문구를 만들고, 설정에서 백업하면 이벤트로 알림 띠를 갱신합니다.
+- 백업 알림은 `backupReminders`가 마지막 백업 후 30일 경과 또는 저장 공간 80% 이상일 때 안내 문구를 만들고, 설정에서 백업하면 이벤트로 알림 띠를 갱신합니다. 띠의 ✕를 누르면 닫은 시각을 저장해(`reading-notes:remind:v1`) 7일 동안 백업 문구를 숨기고, 저장 공간 경고는 닫을 수 없어 계속 표시합니다.
 
 ## 4. 주요 흐름
 **필사 추가**: 사진 선택 → `prepareImage`(긴 변 1800px로 축소) → Tesseract 워커(싱글톤, 최초 1회 언어 데이터 로드) → 원문 → `postprocess`(하이픈·강제 줄바꿈·공백 정리) → 사용자가 수정 → 저장.
@@ -48,6 +48,7 @@
 | CSS `zoom` | 손글씨 크기 보정에 사용 | 지원 안 하는 브라우저에서는 보정만 빠짐 |
 
 ## 6. 보안·공개 범위
+- 저장소(공개): https://github.com/jin090201/bookandpen · 배포: https://jin090201.github.io/bookandpen/
 - 서버·인증 정보 없음. `.gitignore`가 키·인증서·환경 변수·`.npmrc`·테스트 파일·백업 JSON·사진을 제외합니다.
 - `public/` 폴더 안의 이미지(아이콘·로고)는 예외로 올라갑니다. 다른 폴더의 이미지는 `.gitignore`에 예외 한 줄을 추가해야 합니다.
 - 시작할 때 `navigator.storage.persist()`로 브라우저가 기록을 임의로 지우지 않도록 요청합니다(허용 여부는 브라우저가 결정).

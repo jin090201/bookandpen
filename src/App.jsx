@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import {
   BACKUP_EVENT,
   backupReminders,
+  closeBackupReminder,
   getLastBackup,
+  getRemindClosedAt,
   loadData,
   saveData,
   storageUsage,
@@ -17,7 +19,7 @@ import StatsView from './components/StatsView.jsx';
 const TABS = [
   ['shelf', '📚', '책장'],
   ['favorites', '★', '즐겨찾기'],
-  ['record', '📅', '기록'],
+  ['record', '📝', '기록'],
   ['settings', '⚙', '설정'],
 ];
 
@@ -30,7 +32,7 @@ export default function App() {
 
   const [usage, setUsage] = useState(storageUsage);
   const [lastBackup, setLastBackup] = useState(getLastBackup);
-  const [remindClosed, setRemindClosed] = useState(false);
+  const [remindClosedAt, setRemindClosedAt] = useState(getRemindClosedAt);
   const [undo, setUndo] = useState(null); // { label, removed: { books, transcriptions } }
 
   useEffect(() => {
@@ -208,8 +210,9 @@ export default function App() {
         </div>
       )}
 
-      {view.name === 'books' && !remindClosed && (() => {
-        const reasons = backupReminders(data, lastBackup, usage);
+      {view.name === 'books' && (() => {
+        const { backup, space } = backupReminders(data, lastBackup, usage, remindClosedAt);
+        const reasons = [...backup, ...space];
         if (reasons.length === 0) return null;
         return (
           <div className="flex items-center gap-2 bg-amber-100 px-4 py-2 text-sm text-amber-900">
@@ -219,9 +222,18 @@ export default function App() {
             <button onClick={() => setTab('settings')} className="font-semibold underline">
               설정으로
             </button>
-            <button onClick={() => setRemindClosed(true)} aria-label="닫기" className="px-1">
-              ✕
-            </button>
+            {backup.length > 0 && (
+              <button
+                onClick={() => {
+                  closeBackupReminder();
+                  setRemindClosedAt(new Date().toISOString());
+                }}
+                aria-label="7일 동안 닫기"
+                className="px-1"
+              >
+                ✕
+              </button>
+            )}
           </div>
         );
       })()}

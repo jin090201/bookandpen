@@ -10,6 +10,7 @@
 | `reading-notes:settings:v1` | 화면 설정 | 미포함 |
 | `reading-notes:calendar:v1` | 달력 설정(5절) | 미포함 |
 | `reading-notes:backup:v1` | 마지막 백업 시각(ISO 8601). 백업 알림 계산용 | 미포함 |
+| `reading-notes:remind:v1` | 백업 알림 띠를 닫은 시각(ISO 8601). 닫은 뒤 7일 동안 백업 문구를 숨김. 없으면 닫은 적 없음 | 미포함 |
 
 ## 2. 관계도
 ```
@@ -46,7 +47,7 @@ books (1) ───< transcriptions (N)
 
 | 필드 | 값 | 기본값 |
 |---|---|---|
-| size | `sm` `md` `lg` `xl` (112.5·125·137.5·150%) | `md` |
+| size | `sm` `md` `lg` `xl` (100·112.5·125·137.5% = 16·18·20·22px) | `md` |
 | uiFont | `sans` `dodum` `batang` | `sans` |
 | bodyFont | `sans` `serif` `batang` `dodum` `pen` | `serif` |
 | theme | `light` `dark` `sepia` `auto` | `light` |
