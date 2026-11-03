@@ -29,6 +29,9 @@ body {
   background: rgb(var(--c-stone-50));
   color: rgb(var(--c-stone-800));
   -webkit-tap-highlight-color: transparent;
+  /* 한글을 단어(띄어쓰기) 단위로 줄바꿈합니다. 한 단어가 줄보다 길면 그때만 글자 중간에서 끊습니다. */
+  word-break: keep-all;
+  overflow-wrap: anywhere;
 }
 
 /* 글꼴 규칙: 제목·필사 본문 = font-body(설정의 '필사 본문 글꼴'), 그 외 = 설정의 '화면 글꼴'.

@@ -323,11 +323,12 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
       </p>
 
       <div className="mt-3">
-        <div className="flex items-center justify-between">
+        {/* 글자 크기가 커서 한 줄에 다 안 들어가면 버튼들이 통째로 아래 줄로 내려가고, 버튼 글자는 중간에서 끊기지 않습니다. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <label className="text-sm font-semibold text-stone-700">
             필사 내용 (직접 수정할 수 있어요)
           </label>
-          <div className="flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-3 whitespace-nowrap">
             {rawText && rawWhole && (
               <button
                 onClick={reprocess}
@@ -371,7 +372,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
                 <button
                   key={w}
                   onClick={() => selectWord(w)}
-                  className="rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-sm text-stone-800"
+                  className="rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-sm text-amber-900"
                 >
                   {w}
                 </button>
