@@ -7,8 +7,9 @@
 #   (API 키는 브라우저 코드에 넣으면 노출되므로, 서버를 거치는 방식이 필요합니다.)
 #
 # 현재 앱이 외부와 통신하는 곳(자체 API 아님):
-#   - Tesseract.js 언어 데이터 내려받기 (첫 글자 인식 때 1회, 이후 브라우저 캐시)
-#   - Google Fonts 글꼴 내려받기 (fonts.googleapis.com)
+#   - Tesseract.js 엔진(워커·코어)과 언어 데이터 내려받기 (cdn.jsdelivr.net, 첫 글자 인식 때 1회, 이후 브라우저 캐시)
+#   - Google Fonts 글꼴 내려받기 (fonts.googleapis.com, fonts.gstatic.com)
+#   - 배포본의 CSP는 위 주소만 허용합니다. 외부 주소를 새로 쓰면 vite.config.js의 CSP에도 추가해야 합니다. (docs/deployment.md 참고)
 
 openapi: 3.0.3
 info:

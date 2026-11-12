@@ -13,6 +13,13 @@ const CORNERS = [
   { mode: 'se', label: '오른쪽 아래 모서리', style: { left: '100%', top: '100%' } },
 ];
 
+const KEYS = {
+  ArrowLeft: [-1, 0],
+  ArrowRight: [1, 0],
+  ArrowUp: [0, -1],
+  ArrowDown: [0, 1],
+};
+
 export default function CropView({ file, onConfirm, onSkip, onCancel }) {
   const [url, setUrl] = useState(null);
   const [rect, setRect] = useState(FULL);
@@ -29,6 +36,8 @@ export default function CropView({ file, onConfirm, onSkip, onCancel }) {
     e.preventDefault();
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
+    // 끌던 곳에 포커스를 두어, 끈 뒤 바로 방향키로 미세하게 맞출 수 있게 합니다.
+    e.currentTarget.focus();
     dragRef.current = {
       mode,
       startX: e.clientX,
@@ -38,32 +47,44 @@ export default function CropView({ file, onConfirm, onSkip, onCancel }) {
     };
   };
 
-  const moveDrag = (e) => {
-    const d = dragRef.current;
-    if (!d) return;
-    const dx = (e.clientX - d.startX) / d.box.width;
-    const dy = (e.clientY - d.startY) / d.box.height;
-    const s = d.start;
-
-    if (d.mode === 'move') {
-      setRect({
+  // 영역 s를 (dx, dy)(사진 크기에 대한 비율)만큼 옮기거나(mode 'move') 모서리를 움직인 새 영역을 돌려줍니다.
+  const applyDelta = (mode, s, dx, dy) => {
+    if (mode === 'move') {
+      return {
         x: clamp(s.x + dx, 0, 1 - s.w),
         y: clamp(s.y + dy, 0, 1 - s.h),
         w: s.w,
         h: s.h,
-      });
-      return;
+      };
     }
 
     let left = s.x;
     let top = s.y;
     let right = s.x + s.w;
     let bottom = s.y + s.h;
-    if (d.mode.includes('w')) left = clamp(left + dx, 0, right - MIN_SIZE);
-    if (d.mode.includes('e')) right = clamp(right + dx, left + MIN_SIZE, 1);
-    if (d.mode.includes('n')) top = clamp(top + dy, 0, bottom - MIN_SIZE);
-    if (d.mode.includes('s')) bottom = clamp(bottom + dy, top + MIN_SIZE, 1);
-    setRect({ x: left, y: top, w: right - left, h: bottom - top });
+    if (mode.includes('w')) left = clamp(left + dx, 0, right - MIN_SIZE);
+    if (mode.includes('e')) right = clamp(right + dx, left + MIN_SIZE, 1);
+    if (mode.includes('n')) top = clamp(top + dy, 0, bottom - MIN_SIZE);
+    if (mode.includes('s')) bottom = clamp(bottom + dy, top + MIN_SIZE, 1);
+    return { x: left, y: top, w: right - left, h: bottom - top };
+  };
+
+  const moveDrag = (e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = (e.clientX - d.startX) / d.box.width;
+    const dy = (e.clientY - d.startY) / d.box.height;
+    setRect(applyDelta(d.mode, d.start, dx, dy));
+  };
+
+  // 키보드: 방향키로 1%씩, Shift와 함께 누르면 5%씩 움직입니다.
+  const onKey = (e, mode) => {
+    const dir = KEYS[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const step = e.shiftKey ? 0.05 : 0.01;
+    setRect((r) => applyDelta(mode, r, dir[0] * step, dir[1] * step));
   };
 
   const endDrag = () => {
@@ -81,7 +102,7 @@ export default function CropView({ file, onConfirm, onSkip, onCancel }) {
       </button>
       <h1 className="mt-3 font-body text-2xl font-bold">인식할 부분 고르기</h1>
       <p className="mt-1 text-sm text-stone-500">
-        필사할 글 부분만 네모로 골라 주세요. 모서리를 끌면 크기가, 안쪽을 끌면 위치가 바뀌어요.
+        필사할 부분만 네모로 골라 주세요. 모서리는 크기, 안쪽은 위치를 바꿔요. 방향키로도 움직일 수 있어요.
       </p>
 
       <div className="mt-4 flex justify-center">
@@ -119,7 +140,11 @@ export default function CropView({ file, onConfirm, onSkip, onCancel }) {
             onPointerMove={moveDrag}
             onPointerUp={endDrag}
             onPointerCancel={endDrag}
-            className="absolute cursor-move touch-none border-2 border-white ring-1 ring-black/40"
+            onKeyDown={(e) => onKey(e, 'move')}
+            role="button"
+            tabIndex={0}
+            aria-label="선택한 영역 (방향키로 위치 이동)"
+            className="absolute cursor-move touch-none border-2 border-white ring-1 ring-black/40 focus-visible:outline-dashed focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-black"
             style={{ left: pct(rect.x), top: pct(rect.y), width: pct(rect.w), height: pct(rect.h) }}
           >
             {CORNERS.map((c) => (
@@ -131,10 +156,13 @@ export default function CropView({ file, onConfirm, onSkip, onCancel }) {
                 onPointerMove={moveDrag}
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
-                className="absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 touch-none items-center justify-center"
+                onKeyDown={(e) => onKey(e, c.mode)}
+                tabIndex={0}
+                className="absolute flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 group touch-none items-center justify-center outline-none"
                 style={c.style}
               >
-                <span className="h-4 w-4 rounded-full border-2 border-white bg-accent shadow" />
+                {/* 키보드 포커스는 포인트 색과 상관없이 보이도록 흰 링과 검은 바깥 선으로 표시합니다. */}
+                <span className="h-4 w-4 rounded-full border-2 border-white bg-accent shadow group-focus-visible:ring-4 group-focus-visible:ring-white group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-offset-4 group-focus-visible:outline-black" />
               </div>
             ))}
           </div>

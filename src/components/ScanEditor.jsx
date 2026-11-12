@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { recognizeImage } from '../lib/ocr.js';
+import { recognizeImage, makePreview } from '../lib/ocr.js';
 import { postprocess } from '../lib/postprocess.js';
 import Chip from './Chip.jsx';
 import CropView from './CropView.jsx';
@@ -102,12 +102,17 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
     }
 
     setError('');
-    setPreviewUrl(URL.createObjectURL(file));
     setBusy(true);
     setProgress(0);
     setStatusText('준비 중…');
 
     try {
+      // 미리보기에는 인식에 쓴 부분만 보여 줍니다. 만들지 못하면 사진 전체를 보여 줍니다.
+      try {
+        setPreviewUrl(URL.createObjectURL(await makePreview(file, crop)));
+      } catch {
+        setPreviewUrl(URL.createObjectURL(file));
+      }
       const { text, doubtful: found } = await recognizeImage(file, (m) => {
         if (m.status === 'recognizing text') {
           setStatusText('글자 인식 중…');
@@ -120,7 +125,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
       const cleaned = postprocess(text);
       if (!cleaned) {
         // 인식된 글자가 없으면 기존 내용을 건드리지 않습니다.
-        setError('글자를 찾지 못했어요. 더 밝고 선명하게 다시 찍어 보세요.');
+        setError('글자를 찾지 못했어요. 고른 부분에 글자가 있는지 확인하거나, 더 밝고 선명하게 다시 찍어 보세요.');
         return;
       }
       // 이어 붙이기를 골랐고 기존에 적던 내용이 있으면 아래에 붙이고, 그 밖에는 새 글자로 채웁니다.
@@ -160,14 +165,20 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
   };
 
   // 칩을 누르면 본문에서 그 단어를 선택합니다. 같은 단어를 다시 누르면 다음 위치로 넘어갑니다.
+  // 짧은 단어는 다른 단어의 일부로도 자주 나오므로, 앞뒤가 글자·숫자가 아닌(따로 쓰인) 위치를 먼저 찾고 없을 때만 일부로 들어 있는 위치를 씁니다.
   const selectWord = (word) => {
     const ta = textareaRef.current;
     if (!ta) return;
-    const selected = ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    const text = ta.value;
+    const all = [];
+    for (let i = text.indexOf(word); i >= 0; i = text.indexOf(word, i + 1)) all.push(i);
+    if (all.length === 0) return;
+    const isLetter = (c) => c !== undefined && /[\p{L}\p{N}]/u.test(c);
+    const alone = all.filter((i) => !isLetter(text[i - 1]) && !isLetter(text[i + word.length]));
+    const spots = alone.length > 0 ? alone : all;
+    const selected = text.slice(ta.selectionStart, ta.selectionEnd);
     const from = selected === word ? ta.selectionEnd : 0;
-    let idx = ta.value.indexOf(word, from);
-    if (idx < 0) idx = ta.value.indexOf(word);
-    if (idx < 0) return;
+    const idx = spots.find((i) => i >= from) ?? spots[0];
     ta.focus();
     ta.setSelectionRange(idx, idx + word.length);
     scrollToWord(ta, idx, word.length);
@@ -265,11 +276,9 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
       />
 
       <p className="mt-2 text-xs text-stone-400">
-        팁: 필사할 부분만 화면에 크게 나오게, 밝은 곳에서 정면으로 찍어 주세요.
+        팁: 밝은 곳에서 필사할 부분이 크게 나오게 정면으로 찍어 주세요.
         <br />
-        사진 속 글자는 모두 본문에 들어가요. 페이지 숫자나 머리글이 같이 찍히면 본문에 섞이니, 지우고 페이지 칸에 직접 입력해 주세요.
-        <br />
-        인식이 잘 맞지 않으면 폰의 글자 복사 기능(갤러리나 카메라의 텍스트 인식, 구글 렌즈 등)으로 글자를 복사해 아래 필사 내용에 붙여 넣어도 돼요.
+        인식이 안 맞을 때나 자세한 방법은 설정의 “사용 방법”을 참고해 주세요.
       </p>
 
       {previewUrl && (
@@ -352,9 +361,9 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
           value={content}
           onChange={(e) => setContent(e.target.value)}
           readOnly={busy} // 인식 중에 쓴 글이 결과로 덮어써지지 않게 잠급니다.
-          rows={9}
           placeholder="사진을 인식하면 여기에 글이 나타나요. 직접 입력해도 돼요."
-          className="mt-1 w-full rounded-xl border border-stone-300 bg-white p-3 font-body text-base leading-relaxed outline-none focus:border-stone-500"
+          // 높이를 화면의 약 40%로 고정하고 긴 글은 입력칸 안에서 스크롤해, 아래 확인 칩이 함께 보이게 합니다.
+          className="mt-1 h-[40vh] min-h-48 w-full resize-none rounded-xl border border-stone-300 bg-white p-3 font-body text-base leading-relaxed outline-none focus:border-stone-500"
         />
         {brokenPhoto && (
           <p className="mt-2 text-xs text-amber-700">
@@ -363,25 +372,28 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
           </p>
         )}
         {toCheck.length > 0 && (
-          <div className="mt-2">
-            <p className="text-xs text-stone-500">
-              잘못 읽었을 수 있는 글자예요. 누르면 본문에서 찾아 줘요.
-            </p>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {toCheck.map((w) => (
-                <button
-                  key={w}
-                  onClick={() => selectWord(w)}
-                  className="rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-sm text-amber-900"
-                >
-                  {w}
-                </button>
-              ))}
+          <>
+            {/* 화면을 위아래로 스크롤해도 칩이 보이도록 위·아래 어느 쪽으로 밀려나도 화면 가장자리에 붙어 있게 합니다. */}
+            <div className="sticky bottom-2 top-0 z-10 -mx-1 mt-1 bg-stone-50 px-1 py-1.5 shadow-[0_1px_0_0_rgb(0_0_0/0.08)]">
+              <p className="text-xs text-stone-500">
+                잘못 읽었을 수 있는 글자예요. 누르면 본문에서 찾아 줘요.
+              </p>
+              <div className="mt-1 flex gap-1.5 overflow-x-auto pb-1">
+                {toCheck.map((w) => (
+                  <button
+                    key={w}
+                    onClick={() => selectWord(w)}
+                    className="shrink-0 rounded-full border border-amber-400 bg-amber-50 px-2.5 py-0.5 text-sm text-amber-900"
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
             </div>
             <p className="mt-1 text-xs text-stone-400">
               글자 하나가 비슷한 글자로 바뀐 경우(예: 도구→노구)는 표시되지 않으니 한 번 더 읽어 주세요.
             </p>
-          </div>
+          </>
         )}
         <p className={`mt-1 text-right text-xs ${overContent ? 'text-red-600' : 'text-stone-500'}`}>
           {num(contentLen)} / {num(LIMITS.content)}자

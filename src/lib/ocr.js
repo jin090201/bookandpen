@@ -98,6 +98,35 @@ async function prepareImage(file, crop = null, maxSide = 2800) {
   });
 }
 
+// 필사 화면에 보여 줄 미리보기 이미지입니다. 인식에 쓴 부분(crop)만 잘라 긴 변 1200px 이하로 줄이며, 인식용과 달리 흑백 보정은 하지 않습니다.
+export async function makePreview(file, crop = null, maxSide = 1200) {
+  let bitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    bitmap = await createImageBitmap(file);
+  }
+  const sx = crop ? Math.round(crop.x * bitmap.width) : 0;
+  const sy = crop ? Math.round(crop.y * bitmap.height) : 0;
+  const sw = crop ? Math.max(1, Math.round(crop.w * bitmap.width)) : bitmap.width;
+  const sh = crop ? Math.max(1, Math.round(crop.h * bitmap.height)) : bitmap.height;
+  const scale = Math.min(1, maxSide / Math.max(sw, sh));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(sw * scale));
+  canvas.height = Math.max(1, Math.round(sh * scale));
+  canvas.getContext('2d').drawImage(bitmap, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('미리보기 변환 실패'))),
+      'image/jpeg',
+      0.85
+    );
+  });
+}
+
 // 인식 신뢰도(0~100)가 이 값 미만인 단어를 "확인해 볼 단어"로 돌려줍니다.
 // 시험 결과, 영문이 기호·숫자로 깨진 오류는 대부분 70 미만이었고 맞게 읽힌 단어는 대부분 87 이상이었습니다.
 // 반면 글자 하나가 비슷한 글자로 바뀐 오류(도구→노구 등)는 엔진이 높은 신뢰도로 내놓아 잡지 못합니다.
