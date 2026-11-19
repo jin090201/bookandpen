@@ -5,6 +5,7 @@ import Chip from './Chip.jsx';
 import Note, { DOUBT_WARNING } from './Note.jsx';
 import CropView from './CropView.jsx';
 import { uid, KIND_LABEL, kindsOf, LIMITS, countChars } from '../lib/storage.js';
+import { dayKey } from '../lib/date.js';
 
 const MAX_CHIPS = 10;
 
@@ -64,6 +65,9 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
   const [page, setPage] = useState(editing?.page ? String(editing.page) : '');
   const [memo, setMemo] = useState(editing?.memo ?? '');
   const [kinds, setKinds] = useState(editing ? kindsOf(editing) : ['quote']);
+  // 기록한 날: 새 필사는 오늘, 수정은 원래 기록한 날이 기본값입니다.
+  const todayKey = dayKey(new Date());
+  const [day, setDay] = useState(editing ? dayKey(editing.created_at) : todayKey);
   const toggleKind = (key) =>
     setKinds((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
 
@@ -195,6 +199,14 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
   const save = () => {
     if (!content.trim() || overContent || overMemo) return;
     const pageNum = parseInt(page, 10);
+    // 날짜만 바꾸고 시각은 유지해 같은 날 필사의 순서가 흐트러지지 않게 합니다. 비었거나 미래 날짜면 기본값을 씁니다.
+    const baseIso = editing?.created_at ?? new Date().toISOString();
+    let createdAt = baseIso;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(day) && day <= todayKey && day !== dayKey(baseIso)) {
+      const [y, m, d] = day.split('-').map(Number);
+      const t = new Date(baseIso);
+      createdAt = new Date(y, m - 1, d, t.getHours(), t.getMinutes(), t.getSeconds(), t.getMilliseconds()).toISOString();
+    }
     onSave({
       transcription_id: editing?.transcription_id ?? uid(),
       book_id: book.book_id,
@@ -203,7 +215,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
       memo: memo.trim(),
       kinds,
       favorite: editing?.favorite ?? false,
-      created_at: editing?.created_at ?? new Date().toISOString(),
+      created_at: createdAt,
     });
   };
 
@@ -416,6 +428,18 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
           {num(memoLen)} / {num(LIMITS.memo)}자
           {overMemo && ` · ${num(memoLen - LIMITS.memo)}자를 줄여 주세요`}
         </p>
+      </div>
+
+      <div className="mt-3">
+        <label className="text-sm font-semibold text-stone-700">기록한 날</label>
+        <input
+          type="date"
+          value={day}
+          max={todayKey}
+          onChange={(e) => setDay(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 outline-none focus:border-stone-500"
+        />
+        <p className="mt-1 text-xs text-stone-500">오늘까지만 고를 수 있어요. 달력과 통계는 이 날짜를 기준으로 보여요.</p>
       </div>
 
       <button

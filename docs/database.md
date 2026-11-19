@@ -42,7 +42,7 @@ books (1) ───< transcriptions (N)
 | kinds | string[] | | `quote`(책 문장) / `mine`(내 글)을 함께 담을 수 있고, 빈 배열은 미분류 |
 | kind | string | | (예전 기록) `quote` / `thought` / `summary`. `kinds`가 없으면 quote → 책 문장, thought·summary → 내 글, 값이 없으면 책 문장으로 읽음 |
 | favorite | boolean | | 없는 기존 기록은 `false`로 취급 |
-| created_at | string | O | ISO 8601 시각 |
+| created_at | string | O | ISO 8601 시각. 달력·통계는 이 값의 날짜로 묶음. 필사 추가·수정 화면에서 날짜(오늘까지)를 바꾸면 시각은 그대로 두고 날짜만 바뀜 |
 
 ## 5. 설정 (`reading-notes:settings:v1`) · 달력 설정 (`reading-notes:calendar:v1`)
 - 달력 설정: `weekStart`(0 일요일 / 1 월요일), `mode`(shade 진하기 / dot 점), `range`(month 보는 달 / all 전체), `format`(md / txt). 백업에는 포함되지 않음.
