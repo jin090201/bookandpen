@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import Chip from './Chip.jsx';
+import Note, { RichText } from './Note.jsx';
 import Pager, { usePaging } from './Pager.jsx';
 import SearchView, { findTranscriptions } from './SearchView.jsx';
 import { dotDate, fileStamp } from '../lib/date.js';
@@ -874,34 +875,6 @@ const GUIDE = [
   },
 ];
 
-// 사용 방법 글 안의 **굵게**를 굵은 글씨로 바꿔 보여 줍니다.
-function GuideText({ text }) {
-  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
-    part.startsWith('**') ? (
-      <strong key={i} className="font-semibold text-stone-800">
-        {part.slice(2, -2)}
-      </strong>
-    ) : (
-      part
-    )
-  );
-}
-
-// 팁·주의 상자
-function GuideNote({ kind, text }) {
-  const warn = kind === 'warn';
-  return (
-    <div
-      className={`mt-2.5 rounded-r-lg border-l-4 px-3 py-2 text-sm leading-relaxed ${
-        warn ? 'border-amber-400 bg-stone-50 text-stone-700' : 'border-stone-300 bg-stone-50 text-stone-600'
-      }`}
-    >
-      <p className="mb-0.5 text-xs font-semibold text-stone-500">{warn ? '⚠ 주의' : '💡 팁'}</p>
-      <GuideText text={text} />
-    </div>
-  );
-}
-
 function Hint({ children }) {
   return <p className="mt-0.5 whitespace-pre-line text-xs text-stone-500">{children}</p>;
 }
@@ -1289,9 +1262,11 @@ export function SettingsView({ data, onImport, onClearAll }) {
       </Section>
 
       <Section title="데이터" open={open.backup} onToggle={() => toggle('backup')}>
-        <p className="text-xs text-stone-500">
-          브라우저 데이터를 지우면 기록도 사라져요. 가끔 파일로 내려받아 두세요.
-        </p>
+        <Note
+          kind="warn"
+          className=""
+          text={'브라우저 데이터를 지우면 **기록도 사라져요.**\n가끔 파일로 내려받아 두세요.'}
+        />
         <p className="mt-2 text-xs text-stone-600">
           저장 공간 {storageUsage().pct}% 사용 · 마지막 백업{' '}
           {getLastBackup() ? dotDate(getLastBackup()) : '없음'}
@@ -1343,16 +1318,18 @@ export function SettingsView({ data, onImport, onClearAll }) {
             개인정보 안내
           </summary>
           <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-            {'모든 기록은 이 기기의 브라우저에만 저장돼요. 최근 검색어도 마찬가지예요.\n서버로 보내는 정보가 없고, 사진은 이 기기 안에서만 처리돼요.\n처음 글자를 인식할 때 언어 데이터를 내려받는 것 외에는 인터넷을 쓰지 않아요.'}
+            <RichText text={'모든 기록은 **이 기기의 브라우저에만** 저장돼요.\n**서버로 보내는 정보가 없고**, 사진은 이 기기 안에서만 처리돼요.\n처음 글자를 인식할 때 언어 데이터를 내려받는 것 외에는 인터넷을 쓰지 않아요.'} />
           </p>
+          <Note kind="tip" text="최근 검색어도 이 기기에만 저장되고, 백업에는 들어가지 않아요." />
         </details>
         <details className="border-t border-stone-200 py-2">
           <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
             저작권 안내
           </summary>
           <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-            {'책에서 옮겨 적은 글의 저작권은 해당 책의 저자와 출판사에 있어요.\n필사 기록은 개인 감상용으로 쓰고, 블로그·SNS 등에 공개하거나 공유할 때는 출처를 밝히고 분량에 유의해 주세요.'}
+            <RichText text={'책에서 옮겨 적은 글의 저작권은 해당 책의 **저자와 출판사**에 있어요.\n필사 기록은 **개인 감상용**으로 써 주세요.'} />
           </p>
+          <Note kind="warn" text="블로그·SNS 등에 공개하거나 공유할 때는 출처를 밝히고 분량에 유의해 주세요." />
         </details>
         <details className="border-t border-stone-200 py-2">
           <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -1376,10 +1353,10 @@ export function SettingsView({ data, onImport, onClearAll }) {
               </summary>
               {/* 설명 안의 줄바꿈(\n)을 그대로 보여 줍니다. */}
               <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-                <GuideText text={g.a} />
+                <RichText text={g.a} />
               </p>
-              {g.tip && <GuideNote kind="tip" text={g.tip} />}
-              {g.warn && <GuideNote kind="warn" text={g.warn} />}
+              {g.tip && <Note kind="tip" text={g.tip} />}
+              {g.warn && <Note kind="warn" text={g.warn} />}
             </details>
           ))}
         </div>

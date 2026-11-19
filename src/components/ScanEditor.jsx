@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { recognizeImage, makePreview } from '../lib/ocr.js';
 import { postprocess } from '../lib/postprocess.js';
 import Chip from './Chip.jsx';
+import Note from './Note.jsx';
 import CropView from './CropView.jsx';
 import { uid, KIND_LABEL, kindsOf, LIMITS, countChars } from '../lib/storage.js';
 
@@ -275,11 +276,11 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
         className="hidden"
       />
 
-      <p className="mt-2 text-xs text-stone-400">
-        팁: 밝은 곳에서 필사할 부분이 크게 나오게 정면으로 찍어 주세요.
-        <br />
-        인식이 안 맞을 때나 자세한 방법은 설정의 “사용 방법”을 참고해 주세요.
-      </p>
+      <Note
+        kind="tip"
+        className="mt-3"
+        text={'밝은 곳에서 필사할 부분이 크게 나오게 정면으로 찍어 주세요.\n인식이 안 맞을 때나 자세한 방법은 설정의 **사용 방법**을 참고해 주세요.'}
+      />
 
       {previewUrl && (
         <img
@@ -390,9 +391,11 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
                 ))}
               </div>
             </div>
-            <p className="mt-1 text-xs text-stone-400">
-              글자 하나가 비슷한 글자로 바뀐 경우(예: 도구→노구)는 표시되지 않으니 한 번 더 읽어 주세요.
-            </p>
+            <Note
+              kind="warn"
+              className="mt-2"
+              text="글자 하나가 비슷한 글자로 바뀐 경우(예: 도구→노구)는 표시되지 않으니 한 번 더 읽어 주세요."
+            />
           </>
         )}
         <p className={`mt-1 text-right text-xs ${overContent ? 'text-red-600' : 'text-stone-500'}`}>
