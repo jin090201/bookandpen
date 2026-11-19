@@ -47,7 +47,7 @@ export function parseBackup(text) {
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error('JSON 파일이 아니에요.');
+    throw new Error('북앤펜 백업 파일(.json)만 가져올 수 있어요. 파일이 깨졌거나 다른 형식이에요.');
   }
   if (
     !parsed ||
@@ -58,7 +58,7 @@ export function parseBackup(text) {
     !Array.isArray(parsed.books) ||
     !Array.isArray(parsed.transcriptions)
   ) {
-    throw new Error('북앤펜에서 내보낸 백업 파일이 아니에요.');
+    throw new Error('북앤펜 백업 파일(.json)만 가져올 수 있어요. 다른 앱의 파일은 불러올 수 없어요.');
   }
   const books = parsed.books.filter(
     (b) => b && typeof b.book_id === 'string' && typeof b.title === 'string'
