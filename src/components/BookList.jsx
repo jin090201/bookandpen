@@ -549,19 +549,19 @@ export function FavoritesView({
 const GUIDE = [
   {
     q: '1. 책 등록하기',
-    a: '책장 탭 오른쪽 위의 “+ 책 등록”을 누르고 제목을 입력한 뒤 “등록하기”를 누르세요. 저자는 비워도 돼요.',
+    a: '책장 탭 오른쪽 위의 “+ 책 등록”을 누르고 제목을 입력한 뒤 “등록하기”를 누르세요.\n저자는 비워도 돼요.',
   },
   {
     q: '2. 사진으로 필사하기',
-    a: '책을 열고 “📷 필사 추가하기”를 눌러 사진을 넣으세요. 필요한 부분만 네모로 골라 “이 부분으로 인식하기”를 누르면 글자가 인식돼요. 틀린 글자를 고친 뒤 “저장하기”를 누르면 끝이에요.\n팁: 페이지 숫자와 머리글은 네모에서 빼 주세요. 인식이 안 맞으면 폰의 글자 복사 기능(구글 렌즈 등)으로 복사해 붙여 넣어도 돼요.',
+    a: '책을 열고 “📷 필사 추가하기”를 눌러 사진을 넣으세요.\n필요한 부분만 네모로 골라 “이 부분으로 인식하기”를 누르면 글자가 인식돼요.\n틀린 글자를 고친 뒤 “저장하기”를 누르면 끝이에요.\n팁: 페이지 숫자와 머리글은 네모에서 빼 주세요. 인식이 안 맞으면 폰의 글자 복사 기능(구글 렌즈 등)으로 복사해 붙여 넣어도 돼요.',
   },
   {
     q: '3. 마음에 든 문장 모아 보기',
-    a: '필사 옆의 ☆를 누르면 ★가 되고 즐겨찾기 탭에 모여요. 즐겨찾기 탭에서는 여러 개를 골라 한꺼번에 해제할 수도 있어요.',
+    a: '필사 옆의 ☆를 누르면 ★가 되고 즐겨찾기 탭에 모여요.\n즐겨찾기 탭에서는 여러 개를 골라 한꺼번에 해제할 수도 있어요.',
   },
   {
     q: '4. 책 정리하기',
-    a: '책장의 “편집”을 누르면 여러 권을 골라 삭제할 수 있고, “전체 선택”으로 한 번에 고를 수도 있어요. 목록은 오른쪽 위에서 최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순으로 바꿔 볼 수 있어요.',
+    a: '책장의 “편집”을 누르면 여러 권을 골라 삭제할 수 있고, “전체 선택”으로 한 번에 고를 수도 있어요.\n목록은 오른쪽 위에서 최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순으로 바꿔 볼 수 있어요.',
   },
   {
     q: '5. 표시의 뜻',
@@ -573,7 +573,7 @@ const GUIDE = [
   },
   {
     q: '7. 화면 바꾸기',
-    a: '글자 크기와 글꼴, 그리고 화면 구성 편집의 색 테마, 포인트 색, 표지 모양을 바꿀 수 있어요. 바꾸면 바로 적용돼요.',
+    a: '글자 크기와 글꼴, 그리고 화면 구성 편집의 색 테마, 포인트 색, 표지 모양을 바꿀 수 있어요.\n바꾸면 바로 적용돼요.',
   },
   {
     q: '8. 설정 항목 접고 펼치기',
@@ -586,7 +586,7 @@ const GUIDE = [
 ];
 
 function Hint({ children }) {
-  return <p className="mt-0.5 text-xs text-stone-500">{children}</p>;
+  return <p className="mt-0.5 whitespace-pre-line text-xs text-stone-500">{children}</p>;
 }
 
 // 화면 구성 편집 미리보기: 옵션을 바꾸면 바로 달라져요 (현재 색 테마·포인트 색 그대로 표시)
@@ -877,7 +877,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
         </div>
 
         <h3 className="mt-4 text-sm font-semibold text-stone-700">표지 색 밝기</h3>
-        <Hint>1단계는 연하고, 3단계는 조금 진해요. 자동은 등록 순서대로 1·2·3단계를 번갈아 써요.</Hint>
+        <Hint>{'1단계는 연하고, 3단계는 조금 진해요.\n자동은 등록 순서대로 1·2·3단계를 번갈아 써요.'}</Hint>
         <div className="mt-2 grid grid-cols-4 gap-2">
           {SHADE_OPTIONS.map((o) => (
             <ChoiceButton
@@ -942,8 +942,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
 
         <h3 className="mt-4 text-sm font-semibold text-stone-700">표시 항목</h3>
         <Hint>
-          회색 점은 3일 안에 필사한 책, 배지는 읽기 상태(읽는 중·완독·중단)를 보여 줘요.
-          세피아 테마에서는 점이 갈색 톤의 진한 회색으로 보여요.
+          {'회색 점은 3일 안에 필사한 책, 배지는 읽기 상태(읽는 중·완독·중단)를 보여 줘요.\n세피아 테마에서는 점이 갈색 톤의 진한 회색으로 보여요.'}
         </Hint>
         <div className="mt-2 grid grid-cols-2 gap-2">
           <ChoiceButton
@@ -1016,16 +1015,16 @@ export function SettingsView({ data, onImport, onClearAll }) {
           <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
             개인정보 안내
           </summary>
-          <p className="mt-1.5 text-sm leading-relaxed text-stone-600">
-            모든 기록은 이 기기의 브라우저에만 저장돼요. 서버로 보내는 정보가 없고, 사진은 이 기기 안에서만 처리돼요. 처음 글자를 인식할 때 언어 데이터를 내려받는 것 외에는 인터넷을 쓰지 않아요.
+          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
+            {'모든 기록은 이 기기의 브라우저에만 저장돼요.\n서버로 보내는 정보가 없고, 사진은 이 기기 안에서만 처리돼요.\n처음 글자를 인식할 때 언어 데이터를 내려받는 것 외에는 인터넷을 쓰지 않아요.'}
           </p>
         </details>
         <details className="border-t border-stone-200 py-2">
           <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
             저작권 안내
           </summary>
-          <p className="mt-1.5 text-sm leading-relaxed text-stone-600">
-            책에서 옮겨 적은 글의 저작권은 해당 책의 저자와 출판사에 있어요. 필사 기록은 개인 감상용으로 쓰고, 블로그·SNS 등에 공개하거나 공유할 때는 출처를 밝히고 분량에 유의해 주세요.
+          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
+            {'책에서 옮겨 적은 글의 저작권은 해당 책의 저자와 출판사에 있어요.\n필사 기록은 개인 감상용으로 쓰고, 블로그·SNS 등에 공개하거나 공유할 때는 출처를 밝히고 분량에 유의해 주세요.'}
           </p>
         </details>
         <details className="border-t border-stone-200 py-2">
