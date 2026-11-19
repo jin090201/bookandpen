@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { downloadTextFile, kindText, pageText, safeFilename } from '../lib/storage.js';
 import { dayKey, dotDate, pad } from '../lib/date.js';
+import Pager, { usePaging } from './Pager.jsx';
 
 // ───────────────── 공통 도우미 (통계 화면에서도 씁니다) ─────────────────
 const SETTINGS_KEY = 'reading-notes:calendar:v1';
@@ -43,26 +44,107 @@ export function groupByDay(transcriptions) {
 }
 
 // 날짜별 필사 목록(책 제목·종류·페이지·내용·메모)
+// 글이 길면 내용 4줄·메모 2줄까지만 보여 주고 "더 보기"로 펼치며, 5개씩 나눠 보여 줍니다.
+// 날짜가 바뀌면 처음부터 보이도록 부르는 쪽에서 key={날짜}를 줍니다.
 export function DayList({ items, titleOf }) {
+  const [expanded, setExpanded] = useState(() => new Set());
+  const { curPage, totalPages, pageItems, goPage } = usePaging(items, undefined, false);
+  const toggle = (id) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   if (items.length === 0) {
     return <p className="py-6 text-center text-sm text-stone-400">이 날은 필사한 글이 없어요.</p>;
   }
   return (
-    <ul className="space-y-2">
-      {items.map((t) => (
-        <li key={t.transcription_id} className="rounded-xl border border-stone-200 bg-white p-3">
-          <p className="text-xs text-stone-500">
-            {titleOf(t.book_id)} · {kindText(t)}
-            {t.page ? ` · ${pageText(t)}` : ''}
-            {t.favorite ? ' · ★' : ''}
-          </p>
-          <p className="mt-1 whitespace-pre-wrap font-body text-sm leading-relaxed">{t.content}</p>
-          {t.memo && (
-            <p className="mt-2 rounded-lg bg-stone-100 p-2 text-xs text-stone-600">메모: {t.memo}</p>
-          )}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="space-y-2">
+        {pageItems.map((t) => {
+          const open = expanded.has(t.transcription_id);
+          const longContent = t.content.length > 100 || t.content.split('\n').length > 4;
+          const longMemo = !!t.memo && (t.memo.length > 50 || t.memo.split('\n').length > 2);
+          return (
+            <li key={t.transcription_id} className="rounded-xl border border-stone-200 bg-white p-3">
+              <p className="text-xs text-stone-500">
+                {titleOf(t.book_id)} · {kindText(t)}
+                {t.page ? ` · ${pageText(t)}` : ''}
+                {t.favorite ? ' · ★' : ''}
+              </p>
+              <p
+                className={`mt-1 whitespace-pre-wrap font-body text-sm leading-relaxed ${
+                  open ? '' : 'line-clamp-4'
+                }`}
+              >
+                {t.content}
+              </p>
+              {t.memo && (
+                <p
+                  className={`mt-2 whitespace-pre-wrap rounded-lg bg-stone-100 p-2 text-xs text-stone-600 ${
+                    open ? '' : 'line-clamp-2'
+                  }`}
+                >
+                  메모: {t.memo}
+                </p>
+              )}
+              {(longContent || longMemo) && (
+                <button onClick={() => toggle(t.transcription_id)} className="mt-1 text-sm text-stone-500">
+                  {open ? '접기' : '더 보기'}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      <Pager curPage={curPage} totalPages={totalPages} goPage={goPage} />
+    </>
+  );
+}
+
+// ───────────────── 연·월 고르기 창 (달력 제목을 누르면 열립니다) ─────────────────
+// year/month: 지금 보는 연·월(month는 0~11), marked: 기록이 있는 달의 "YYYY-MM" 모음
+export function MonthPicker({ year, month, marked, onPick, onClose }) {
+  const [y, setY] = useState(year);
+  const now = new Date();
+  return (
+    <div className="mx-auto mt-2 max-w-sm rounded-xl border border-stone-200 bg-white p-3">
+      <div className="flex items-center justify-between">
+        <button onClick={() => setY(y - 1)} aria-label="이전 해" className="px-3 py-1 text-lg text-stone-600">‹</button>
+        <p className="text-sm font-semibold">{y}년</p>
+        <button onClick={() => setY(y + 1)} aria-label="다음 해" className="px-3 py-1 text-lg text-stone-600">›</button>
+      </div>
+      <div className="mt-2 grid grid-cols-4 gap-2">
+        {Array.from({ length: 12 }, (_, m) => {
+          const on = y === year && m === month;
+          const isNow = y === now.getFullYear() && m === now.getMonth();
+          const has = marked.has(`${y}-${pad(m + 1)}`);
+          return (
+            <button
+              key={m}
+              onClick={() => onPick(y, m)}
+              aria-label={`${y}년 ${m + 1}월${has ? ' 필사 있음' : ''}`}
+              className={`relative rounded-lg py-2 text-sm ${
+                on ? 'bg-accent text-on-accent' : 'border border-stone-200 text-stone-700'
+              } ${!on && isNow ? 'ring-1 ring-stone-400' : ''}`}
+            >
+              {m + 1}월
+              {has && (
+                <span
+                  className={`absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
+                    on ? 'bg-on-accent' : 'bg-accent'
+                  }`}
+                />
+              )}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2 flex justify-between text-sm text-stone-500">
+        <button onClick={() => onPick(now.getFullYear(), now.getMonth())} className="px-2 py-1">이번 달</button>
+        <button onClick={onClose} className="px-2 py-1">닫기</button>
+      </div>
+    </div>
   );
 }
 
@@ -113,8 +195,10 @@ export default function CalendarView({ books, transcriptions }) {
   const [cal, setCal] = useState(loadCalSettings);
   const [draft, setDraft] = useState(null); // 설정 창이 열려 있으면 편집 중인 값
   const [msg, setMsg] = useState('');
+  const [picking, setPicking] = useState(false); // 연·월 고르기 창이 열려 있는지
 
   const byDay = useMemo(() => groupByDay(transcriptions), [transcriptions]);
+  const markedMonths = useMemo(() => new Set(Object.keys(byDay).map((k) => k.slice(0, 7))), [byDay]);
   const titleOf = useMemo(() => {
     const m = Object.fromEntries(books.map((b) => [b.book_id, b.title]));
     return (id) => m[id] || '(삭제된 책)';
@@ -134,6 +218,11 @@ export default function CalendarView({ books, transcriptions }) {
     const d = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
     setSelected(null);
+  };
+  const pickMonth = (y, m) => {
+    setCursor({ y, m });
+    setSelected(null);
+    setPicking(false);
   };
 
   const shadeClass = (n) =>
@@ -232,9 +321,26 @@ export default function CalendarView({ books, transcriptions }) {
 
       <div className="mt-4 flex items-center justify-between">
         <button onClick={() => moveMonth(-1)} aria-label="이전 달" className="px-3 py-1 text-lg text-stone-600">‹</button>
-        <p className="font-semibold">{monthLabel}</p>
+        <button
+          onClick={() => setPicking((v) => !v)}
+          aria-expanded={picking}
+          aria-label="연·월 고르기"
+          className="rounded-lg px-3 py-1 font-semibold"
+        >
+          {monthLabel} <span className="text-xs text-stone-400">{picking ? '▴' : '▾'}</span>
+        </button>
         <button onClick={() => moveMonth(1)} aria-label="다음 달" className="px-3 py-1 text-lg text-stone-600">›</button>
       </div>
+      {picking && (
+        <MonthPicker
+          key={`${cursor.y}-${cursor.m}`}
+          year={cursor.y}
+          month={cursor.m}
+          marked={markedMonths}
+          onPick={pickMonth}
+          onClose={() => setPicking(false)}
+        />
+      )}
       <p className="text-center text-xs text-stone-500">
         이 달 필사한 날 {monthDays.length}일 · 필사 {monthCount}개
       </p>
@@ -274,7 +380,7 @@ export default function CalendarView({ books, transcriptions }) {
             <p className="mb-2 text-sm font-semibold text-stone-700">
               {selectedLabel} · 필사 {selectedItems.length}개
             </p>
-            <DayList items={selectedItems} titleOf={titleOf} />
+            <DayList key={selected} items={selectedItems} titleOf={titleOf} />
           </>
         ) : (
           <p className="py-4 text-center text-sm text-stone-400">날짜를 누르면 그날의 필사가 보여요.</p>

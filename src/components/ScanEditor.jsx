@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { recognizeImage, makePreview } from '../lib/ocr.js';
 import { postprocess } from '../lib/postprocess.js';
 import Chip from './Chip.jsx';
-import Note from './Note.jsx';
+import Note, { DOUBT_WARNING } from './Note.jsx';
 import CropView from './CropView.jsx';
 import { uid, KIND_LABEL, kindsOf, LIMITS, countChars } from '../lib/storage.js';
 
@@ -394,7 +394,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
             <Note
               kind="warn"
               className="mt-2"
-              text="글자 하나가 비슷한 글자로 바뀐 경우(예: 도구→노구)는 표시되지 않으니 한 번 더 읽어 주세요."
+              text={DOUBT_WARNING}
             />
           </>
         )}

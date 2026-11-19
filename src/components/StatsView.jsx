@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { KIND_LABEL, filterByKind } from '../lib/storage.js';
 import { dayKey } from '../lib/date.js';
-import { DayList, groupByDay, loadCalSettings, weekdayNames } from './CalendarView.jsx';
+import { DayList, MonthPicker, groupByDay, loadCalSettings, weekdayNames } from './CalendarView.jsx';
 import Chip from './Chip.jsx';
 
 const num = (n) => n.toLocaleString('ko-KR');
@@ -58,10 +58,12 @@ function DayStats({ books, transcriptions }) {
   const { weekStart } = loadCalSettings();
   const [kind, setKind] = useState('all'); // all | quote | mine | none
   const [selected, setSelected] = useState(() => new Date());
+  const [picking, setPicking] = useState(false); // 연·월 고르기 창이 열려 있는지
   const names = weekdayNames(weekStart);
 
   const filtered = useMemo(() => filterByKind(transcriptions, kind), [transcriptions, kind]);
   const byDay = useMemo(() => groupByDay(filtered), [filtered]);
+  const markedMonths = useMemo(() => new Set(Object.keys(byDay).map((k) => k.slice(0, 7))), [byDay]);
   const titleOf = useMemo(() => {
     const m = Object.fromEntries(books.map((b) => [b.book_id, b.title]));
     return (id) => m[id] || '(삭제된 책)';
@@ -83,6 +85,12 @@ function DayStats({ books, transcriptions }) {
     d.setDate(d.getDate() + delta * 7);
     setSelected(d);
   };
+  // 달을 고르면 그 달 1일이 있는 주로 이동합니다. (이번 달이면 오늘)
+  const pickMonth = (y, m) => {
+    const now = new Date();
+    setSelected(y === now.getFullYear() && m === now.getMonth() ? now : new Date(y, m, 1));
+    setPicking(false);
+  };
 
   return (
     <div className="mt-4">
@@ -96,11 +104,27 @@ function DayStats({ books, transcriptions }) {
 
       <div className="mt-4 flex items-center justify-between">
         <button onClick={() => moveWeek(-1)} aria-label="이전 주" className="px-3 py-1 text-lg text-stone-600">‹</button>
-        <p className="text-sm font-semibold">
-          {selected.getFullYear()}년 {selected.getMonth() + 1}월
-        </p>
+        <button
+          onClick={() => setPicking((v) => !v)}
+          aria-expanded={picking}
+          aria-label="연·월 고르기"
+          className="rounded-lg px-3 py-1 text-sm font-semibold"
+        >
+          {selected.getFullYear()}년 {selected.getMonth() + 1}월{' '}
+          <span className="text-xs text-stone-400">{picking ? '▴' : '▾'}</span>
+        </button>
         <button onClick={() => moveWeek(1)} aria-label="다음 주" className="px-3 py-1 text-lg text-stone-600">›</button>
       </div>
+      {picking && (
+        <MonthPicker
+          key={`${selected.getFullYear()}-${selected.getMonth()}`}
+          year={selected.getFullYear()}
+          month={selected.getMonth()}
+          marked={markedMonths}
+          onPick={pickMonth}
+          onClose={() => setPicking(false)}
+        />
+      )}
 
       <div className="mt-2 grid grid-cols-7 gap-1 text-center">
         {week.map((d, i) => {
@@ -127,7 +151,7 @@ function DayStats({ books, transcriptions }) {
       </div>
 
       <div className="mt-4">
-        <DayList items={items} titleOf={titleOf} />
+        <DayList key={selKey} items={items} titleOf={titleOf} />
       </div>
     </div>
   );
@@ -137,6 +161,14 @@ function DayStats({ books, transcriptions }) {
 function YearStats({ books, transcriptions }) {
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
+  const [picking, setPicking] = useState(false); // 연도 고르기 창이 열려 있는지
+
+  // 고를 수 있는 해: 필사가 있는 해 + 올해 + 지금 보는 해
+  const markedYears = useMemo(
+    () => new Set(transcriptions.map((t) => Number(dayKey(t.created_at).slice(0, 4)))),
+    [transcriptions]
+  );
+  const yearChoices = [...new Set([...markedYears, now.getFullYear(), year])].sort((a, b) => a - b);
 
   const months = useMemo(() => {
     const arr = Array.from({ length: 12 }, () => ({ count: 0, chars: 0 }));
@@ -164,9 +196,47 @@ function YearStats({ books, transcriptions }) {
     <div className="mt-4">
       <div className="flex items-center justify-between">
         <button onClick={() => setYear((y) => y - 1)} aria-label="이전 해" className="px-3 py-1 text-lg text-stone-600">‹</button>
-        <p className="text-sm font-semibold">{year}년</p>
+        <button
+          onClick={() => setPicking((v) => !v)}
+          aria-expanded={picking}
+          aria-label="연도 고르기"
+          className="rounded-lg px-3 py-1 text-sm font-semibold"
+        >
+          {year}년 <span className="text-xs text-stone-400">{picking ? '▴' : '▾'}</span>
+        </button>
         <button onClick={() => setYear((y) => y + 1)} aria-label="다음 해" className="px-3 py-1 text-lg text-stone-600">›</button>
       </div>
+      {picking && (
+        <div className="mx-auto mt-2 max-w-sm rounded-xl border border-stone-200 bg-white p-3">
+          <div className="grid grid-cols-4 gap-2">
+            {yearChoices.map((y) => (
+              <button
+                key={y}
+                onClick={() => {
+                  setYear(y);
+                  setPicking(false);
+                }}
+                aria-label={`${y}년${markedYears.has(y) ? ' 필사 있음' : ''}`}
+                className={`relative rounded-lg py-2 text-sm ${
+                  y === year ? 'bg-accent text-on-accent' : 'border border-stone-200 text-stone-700'
+                }`}
+              >
+                {y}
+                {markedYears.has(y) && (
+                  <span
+                    className={`absolute bottom-1 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full ${
+                      y === year ? 'bg-on-accent' : 'bg-accent'
+                    }`}
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+          <div className="mt-2 text-right text-sm text-stone-500">
+            <button onClick={() => setPicking(false)} className="px-2 py-1">닫기</button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Card label="1년 동안" value={`필사 ${num(totalCount)}개`} sub={`${num(totalChars)}자`} />

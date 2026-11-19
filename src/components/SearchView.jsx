@@ -3,7 +3,6 @@ import Chip from './Chip.jsx';
 import Pager, { usePaging } from './Pager.jsx';
 import { KIND_LABEL, filterByKind, kindText, pageText } from '../lib/storage.js';
 
-const SEARCH_PAGE_SIZE = 5; // "필사" 범위에서 한 화면에 보여 줄 결과 개수
 const PREVIEW_COUNT = 3; // "전체" 범위에서 미리 보여 줄 필사 개수
 const SNIPPET_BEFORE = 30; // 찾은 글자 앞에 보여 줄 글자 수
 const SNIPPET_LENGTH = 130; // 본문 한 건에서 보여 줄 최대 글자 수
@@ -76,10 +75,7 @@ export default function SearchView({
   const bookOf = (id) => books.find((b) => b.book_id === id);
 
   const shown = preview ? found : filterByKind(found, kindFilter);
-  const { curPage, totalPages, pageItems, goPage, resetPage } = usePaging(
-    shown,
-    SEARCH_PAGE_SIZE
-  );
+  const { curPage, totalPages, pageItems, goPage, resetPage } = usePaging(shown);
   // 검색어나 종류가 바뀌면 첫 목록으로 돌아갑니다.
   useEffect(() => {
     resetPage();

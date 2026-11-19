@@ -13,6 +13,10 @@ export function RichText({ text }) {
   );
 }
 
+// 같은 문구를 두 곳(사용 방법 9번, 필사 추가 화면)에서 쓰므로 한 곳에서 정합니다.
+export const DOUBT_WARNING =
+  '글자 하나가 비슷한 글자로 바뀐 경우(예: 도구→노구)는 표시되지 않으니 한 번 더 읽어 주세요.';
+
 // 팁·주의 상자. kind가 'warn'이면 노란 왼쪽 선의 "⚠ 주의", 아니면 "💡 팁"입니다.
 // 배경은 테마 색(stone-50)을 써서 라이트·세피아·다크 모두에서 글자가 읽힙니다.
 export default function Note({ kind = 'tip', text, className = 'mt-2.5' }) {

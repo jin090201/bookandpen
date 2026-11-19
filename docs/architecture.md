@@ -8,7 +8,7 @@
  ├─ React 앱 (Vite 번들)
  │   ├─ App.jsx ........ 상태(data)·화면 전환·데이터 변경 함수
  │   ├─ components/ .... BookList(책장·즐겨찾기·설정), BookDetail, ScanEditor, CropView(인식할 부분 자르기), CalendarView(독서 달력·내려받기), StatsView(통계), SearchView(책장 검색의 필사 결과),
- │   │                    공통: Pager(목록 나누기), Chip(선택 칩), Note(굵은 글씨·팁·주의 상자)
+ │   │                    공통: Pager(목록 나누기, 한 화면 5개는 LIST_PAGE_SIZE 한 곳), Chip(선택 칩), Note(굵은 글씨·팁·주의 상자)
  │   └─ lib/ ........... storage(저장·백업·설정·내보내기·종류 거르기·페이지 표기), date(날짜 표기), ocr, postprocess
  ├─ LocalStorage ....... 기록(reading-notes:v1), 설정(reading-notes:settings:v1), 달력 설정(reading-notes:calendar:v1), 마지막 백업 시각(reading-notes:backup:v1), 알림 띠를 닫은 시각(reading-notes:remind:v1), 최근 검색어(reading-notes:search:v1)
  ├─ Tesseract.js ....... 브라우저 안 OCR (kor+eng)

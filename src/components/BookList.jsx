@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import Chip from './Chip.jsx';
-import Note, { RichText } from './Note.jsx';
+import Note, { DOUBT_WARNING, RichText } from './Note.jsx';
 import Pager, { usePaging } from './Pager.jsx';
 import SearchView, { findTranscriptions } from './SearchView.jsx';
 import { dotDate, fileStamp } from '../lib/date.js';
@@ -655,7 +655,6 @@ export default function BookList({
 }
 
 // ───────────────── 즐겨찾기 탭 ─────────────────
-const FAV_PAGE_SIZE = 3; // 한 화면에 보여 줄 즐겨찾기 개수
 
 export function FavoritesView({
   books,
@@ -666,6 +665,14 @@ export function FavoritesView({
 }) {
   const [selecting, setSelecting] = useState(false); // 선택 모드
   const [picked, setPicked] = useState(() => new Set()); // 선택한 필사 id
+  const [expanded, setExpanded] = useState(() => new Set()); // 펼친 필사 id
+  const toggleExpanded = (id) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const favs = transcriptions
     .filter((t) => t.favorite)
@@ -673,7 +680,7 @@ export function FavoritesView({
   const bookOf = (id) => books.find((b) => b.book_id === id);
 
   // 목록 나누기 (해제로 목록 수가 줄어도 마지막 목록으로 보정)
-  const { curPage, totalPages, pageItems, goPage } = usePaging(favs, FAV_PAGE_SIZE);
+  const { curPage, totalPages, pageItems, goPage } = usePaging(favs);
 
   const pickedIds = favs
     .filter((t) => picked.has(t.transcription_id))
@@ -788,9 +795,21 @@ export function FavoritesView({
                     선택
                   </label>
                 )}
-                <p className="whitespace-pre-wrap font-body text-base leading-relaxed">
+                <p
+                  className={`whitespace-pre-wrap font-body text-base leading-relaxed ${
+                    expanded.has(t.transcription_id) ? '' : 'line-clamp-4'
+                  }`}
+                >
                   {t.content}
                 </p>
+                {(t.content.length > 100 || t.content.split('\n').length > 4) && (
+                  <button
+                    onClick={() => toggleExpanded(t.transcription_id)}
+                    className="mt-1 text-sm text-stone-500"
+                  >
+                    {expanded.has(t.transcription_id) ? '접기' : '더 보기'}
+                  </button>
+                )}
                 <div className="mt-3 flex items-center text-xs text-stone-400">
                   <button
                     onClick={() => b && onOpen(b.book_id)}
@@ -834,10 +853,12 @@ const GUIDE = [
   {
     q: '3. 마음에 든 문장 모아 보기',
     a: '필사 옆의 ☆를 누르면 ★가 되고 **즐겨찾기** 탭에 모여요.\n즐겨찾기 탭에서는 여러 개를 골라 한꺼번에 해제할 수도 있어요.',
+    tip: '긴 필사는 4줄까지만 보여요. **더 보기**를 누르면 펼쳐져요.',
   },
   {
     q: '4. 책 찾고 정리하기',
-    a: '책장 위의 칩으로 상태별(읽고 싶은, 읽는 중, 완독, 중단)로 거르고, 검색 칸에서 책 제목이나 저자, 필사 내용을 함께 찾을 수 있어요.\n검색어 아래의 칩(**전체 · 책 · 필사**)으로 찾을 범위를 바꾸고, 검색 칸을 누르면 최근 검색어가 보여요.\n정렬(최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순)은 칩 아래에서, 보기 방식(▦ 표지형 / ☰ 목록형)은 그 오른쪽에서 바꿔요.\n**편집**을 누르면 여러 권을 골라 삭제할 수 있고, **전체 선택**으로 한 번에 고를 수도 있어요.',
+    a: '책장 위의 칩으로 상태별(읽고 싶은, 읽는 중, 완독, 중단)로 거르고, 검색 칸에서 책 제목, 저자, 필사 내용과 메모를 함께 찾을 수 있어요.\n검색어 아래의 칩(**전체 · 책 · 필사**)으로 찾을 범위를 바꿔요. **필사**를 누르면 필사만 모아 볼 수 있고, 검색 칸을 누르면 최근 검색어가 보여요.\n정렬(최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순)은 칩 아래에서, 보기 방식(▦ 표지형 / ☰ 목록형)은 그 오른쪽에서 바꿔요.\n**편집**을 누르면 여러 권을 골라 삭제할 수 있고, **전체 선택**으로 한 번에 고를 수도 있어요.',
+    tip: '검색에서는 띄어쓰기와 대소문자를 구분하지 않아요.',
   },
   {
     q: '5. 표시의 뜻',
@@ -860,18 +881,22 @@ const GUIDE = [
   },
   {
     q: '9. 잘못 읽은 글자 찾기',
-    a: '인식이 끝나면 필사 내용 아래에 **잘못 읽었을 수 있는 글자**가 나올 수 있어요. 눌러 보면 본문에서 그 글자를 찾아 줘요.\n글자가 많이 깨지면 책을 평평하게 펴서 다시 찍거나, 폰의 글자 복사 기능을 써 보세요.',
-    warn: '글자 하나가 비슷한 글자로 바뀐 경우(예: 도구→노구)는 표시되지 않으니 한 번 더 읽어 주세요.',
+    a: '인식이 끝나면 필사 내용 아래에 **잘못 읽었을 수 있는 글자**가 나올 수 있어요. 눌러 보면 본문에서 그 글자를 찾아 줘요.\n글자가 많이 깨지면 책을 평평하게 펴서 다시 찍어 보세요. 그래도 안 맞으면 **2번**의 글자 복사 방법을 써 보세요.',
+    warn: DOUBT_WARNING,
   },
   {
-    q: '10. 필사 찾기와 내보내기',
-    a: '책장의 검색 칸에서 모든 책의 필사 내용과 메모를 찾을 수 있어요. 결과에서 **필사** 칩을 누르면 필사만 모아 볼 수 있어요.\n책을 열면 필사를 .md나 .txt 파일로 내려받거나, **공유**로 다른 앱에 보낼 수 있어요. PC에서는 **복사**로 보여요.',
-    tip: '검색에서는 띄어쓰기와 대소문자를 구분하지 않아요.',
+    q: '10. 필사 내보내기와 공유',
+    a: '책을 열면 필사를 **.md**나 **.txt** 파일로 내려받을 수 있어요.\n**공유**로 다른 앱에 보낼 수도 있어요. PC에서는 **복사**로 보여요.',
   },
   {
     q: '11. 가져오기와 백업 파일',
     a: '**가져올 수 있는 파일**\n북앤펜에서 내보낸 백업 파일(.json)만 가져올 수 있어요.\n\n**가져올 수 없는 파일**\n필사를 내려받은 .md, .txt 파일과 다른 앱의 파일은 불러올 수 없어요.\n\n**가져오면 이렇게 돼요**\n이미 있는 기록은 건너뛰고, 없는 기록만 더해져요. 화면 설정은 들어 있지 않아요.',
     warn: '백업 파일을 직접 고치면 가져오지 못할 수 있어요.',
+  },
+  {
+    q: '12. 기록 탭에서 날짜별로 보기',
+    a: '**기록** 탭의 **달력**에서는 필사한 날이 진하게 보여요.\n날짜를 누르면 그날의 필사가 보여요.\n제목(**2026년 11월 ▾**)을 누르면 연도와 달을 골라 바로 이동할 수 있어요.\n**통계**에서도 제목을 누르면 날짜(일간)나 연도(연간)를 고를 수 있어요.',
+    tip: '긴 필사는 4줄까지만 보여요. **더 보기**를 누르면 펼쳐져요.\n한 번에 5개씩 보이고, 넘으면 아래 번호로 넘겨 볼 수 있어요.',
   },
 ];
 
@@ -1161,7 +1186,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
         <h3 className="mt-4 text-sm font-semibold text-stone-700">
           표지 색 <span className="font-normal text-stone-500">(연한 파스텔)</span>
         </h3>
-        <Hint>{'책장에 보이는 책 표지의 색 계열이에요.\n책마다는 책 제목에 따라 여러 색이 섞여 나와요.'}</Hint>
+        <Hint>{'책장에 보이는 책 표지의 색 계열이에요.\n책마다는 책 제목에 따라 여러 색이 섞여 보여요.'}</Hint>
         <div className="mt-2 grid grid-cols-4 gap-2">
           {COVER_OPTIONS.map((o) => (
             <ChoiceButton

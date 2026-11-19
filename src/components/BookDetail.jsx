@@ -41,7 +41,6 @@ async function copyText(text) {
   }
 }
 
-const PAGE_SIZE = 3; // 한 화면에 보여 줄 필사 개수
 
 export default function BookDetail({
   book,
@@ -90,7 +89,7 @@ export default function BookDetail({
   const shown = filterByKind(sorted, kindFilter);
 
   // 목록 나누기 (삭제 등으로 목록 수가 줄어도 마지막 목록으로 보정)
-  const { curPage, totalPages, pageItems, goPage, resetPage } = usePaging(shown, PAGE_SIZE);
+  const { curPage, totalPages, pageItems, goPage, resetPage } = usePaging(shown);
 
   const togglePicked = (id) =>
     setPicked((prev) => {
