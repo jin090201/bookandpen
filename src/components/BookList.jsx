@@ -113,6 +113,7 @@ export default function BookList({
   const [searchFocused, setSearchFocused] = useState(false);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
+  const [publisher, setPublisher] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('ALL');
   const [sort, setSort] = useState('recent');
@@ -134,9 +135,10 @@ export default function BookList({
   const submit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd({ title, author });
+    onAdd({ title, author, publisher });
     setTitle('');
     setAuthor('');
+    setPublisher('');
     setShowForm(false);
   };
 
@@ -161,7 +163,7 @@ export default function BookList({
     const list = books.filter(
       (b) =>
         (filter === 'ALL' || b.status === filter) &&
-        (!q || norm(b.title).includes(q) || norm(b.author).includes(q))
+        (!q || norm(b.title).includes(q) || norm(b.author).includes(q) || norm(b.publisher).includes(q))
     );
     const lastOf = (b) => stats[b.book_id]?.last || b.created_at;
     const cmp = {
@@ -189,7 +191,11 @@ export default function BookList({
   const bookMatchCount = useMemo(() => {
     const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
     const q = norm(query);
-    return q ? books.filter((b) => norm(b.title).includes(q) || norm(b.author).includes(q)).length : 0;
+    return q
+      ? books.filter(
+          (b) => norm(b.title).includes(q) || norm(b.author).includes(q) || norm(b.publisher).includes(q)
+        ).length
+      : 0;
   }, [books, query]);
 
   // 최근 검색어는 엔터를 누르거나 결과를 눌러 이동할 때만 저장합니다(입력 도중에는 저장하지 않음).
@@ -287,6 +293,18 @@ export default function BookList({
           {showLimitCount(author, LIMITS.author) && (
             <p className="text-right text-xs text-stone-500">
               {countChars(author)} / {LIMITS.author}자
+            </p>
+          )}
+          <input
+            value={publisher}
+            onChange={(e) => setPublisher(e.target.value)}
+            placeholder="출판사"
+            maxLength={LIMITS.publisher}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-stone-500"
+          />
+          {showLimitCount(publisher, LIMITS.publisher) && (
+            <p className="text-right text-xs text-stone-500">
+              {countChars(publisher)} / {LIMITS.publisher}자
             </p>
           )}
           <button
@@ -842,8 +860,8 @@ export function FavoritesView({
 const GUIDE = [
   {
     q: '1. 책 등록하기',
-    a: '책장 탭 오른쪽 위의 **+ 책 등록**을 누르고 제목을 입력한 뒤 **등록하기**를 누르세요.\n저자는 비워도 돼요.',
-    tip: '제목이나 저자를 잘못 썼다면 책을 열고 **책 정보 수정**에서 고칠 수 있어요.',
+    a: '책장 탭 오른쪽 위의 **+ 책 등록**을 누르고 제목을 입력한 뒤 **등록하기**를 누르세요.\n저자와 출판사는 비워도 돼요.',
+    tip: '제목, 저자, 출판사를 잘못 썼다면 책을 열고 **책 정보 수정**에서 고칠 수 있어요.',
   },
   {
     q: '2. 사진으로 필사하기',

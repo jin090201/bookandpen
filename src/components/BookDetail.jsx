@@ -53,13 +53,14 @@ export default function BookDetail({
   onToggleFavorite,
   onClearTranscriptions,
   onStatusChange,
-  onUpdateInfo, // ({ title, author }) => void
+  onUpdateInfo, // ({ title, author, publisher }) => void
   onDeleteBook,
 }) {
   const [shareMsg, setShareMsg] = useState(null); // 공유 대신 복사했을 때의 안내
-  const [infoEditing, setInfoEditing] = useState(false); // 제목·저자 수정 중
+  const [infoEditing, setInfoEditing] = useState(false); // 제목·저자·출판사 수정 중
   const [titleDraft, setTitleDraft] = useState('');
   const [authorDraft, setAuthorDraft] = useState('');
+  const [publisherDraft, setPublisherDraft] = useState('');
   const [copied, setCopied] = useState(null); // { id, ok }
   const [expanded, setExpanded] = useState(() => new Set()); // 펼친 필사 id
   const [kindFilter, setKindFilter] = useState('all'); // all | quote | mine | none
@@ -77,7 +78,7 @@ export default function BookDetail({
   const handleCopy = async (t) => {
     const text = `${t.content}\n\n- ${book.title}${
       book.author ? `, ${book.author}` : ''
-    }${t.page ? ` (${pageText(t)})` : ''}`;
+    }${book.publisher ? `, ${book.publisher}` : ''}${t.page ? ` (${pageText(t)})` : ''}`;
     const ok = await copyText(text);
     setCopied({ id: t.transcription_id, ok });
     setTimeout(() => setCopied(null), 1500);
@@ -178,7 +179,7 @@ export default function BookDetail({
           onSubmit={(e) => {
             e.preventDefault();
             if (!titleDraft.trim()) return;
-            onUpdateInfo({ title: titleDraft, author: authorDraft });
+            onUpdateInfo({ title: titleDraft, author: authorDraft, publisher: publisherDraft });
             setInfoEditing(false);
           }}
         >
@@ -208,6 +209,19 @@ export default function BookDetail({
               {countChars(authorDraft)} / {LIMITS.author}자
             </p>
           )}
+          <input
+            value={publisherDraft}
+            onChange={(e) => setPublisherDraft(e.target.value)}
+            placeholder="출판사"
+            aria-label="출판사"
+            maxLength={LIMITS.publisher}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-base outline-none focus:border-stone-500"
+          />
+          {showLimitCount(publisherDraft, LIMITS.publisher) && (
+            <p className="text-right text-xs text-stone-500">
+              {countChars(publisherDraft)} / {LIMITS.publisher}자
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -228,7 +242,9 @@ export default function BookDetail({
       ) : (
         <div className="mt-3 min-w-0">
           <h1 className="font-body text-2xl font-bold">{book.title}</h1>
-          <p className="text-sm text-stone-500">{book.author || '저자 미입력'}</p>
+          <p className="truncate text-sm text-stone-500">
+            {[book.author || '저자 미입력', book.publisher].filter(Boolean).join(' · ')}
+          </p>
           <p className="mt-1 text-xs text-stone-500">{periodText}</p>
         </div>
       )}
@@ -262,6 +278,7 @@ export default function BookDetail({
             onClick={() => {
               setTitleDraft(book.title);
               setAuthorDraft(book.author || '');
+              setPublisherDraft(book.publisher || '');
               setInfoEditing(true);
             }}
             className="flex w-full items-center justify-between px-4 py-3 text-left"

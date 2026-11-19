@@ -26,6 +26,7 @@ books (1) ───< transcriptions (N)
 | book_id | string | O | 고유 id (`crypto.randomUUID`, 없으면 시간+난수) |
 | title | string | O | 제목 (앞뒤 공백 제거) |
 | author | string | | 저자, 비어 있으면 `''` |
+| publisher | string | | 출판사(선택, 최대 50자), 없거나 비어 있으면 안 보임. 없는 기존 기록은 그대로 읽고, 백업을 가져올 때 문자열이 아니면 `''`로, 50자를 넘으면 잘라서 읽음 |
 | status | string | O | `WISH`(읽고 싶은) / `READING` / `COMPLETED` / `STOPPED` |
 | completed_at | string | | 완독으로 바꾼 시각(ISO 8601). 완독이 아니게 되면 삭제. 없는 기존 기록은 날짜 없이 권수에만 집계 |
 | created_at | string | O | ISO 8601 시각 |

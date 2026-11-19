@@ -60,9 +60,15 @@ export function parseBackup(text) {
   ) {
     throw new Error('북앤펜 백업 파일(.json)만 가져올 수 있어요. 다른 앱의 파일은 불러올 수 없어요.');
   }
-  const books = parsed.books.filter(
-    (b) => b && typeof b.book_id === 'string' && typeof b.title === 'string'
-  );
+  const books = parsed.books
+    .filter((b) => b && typeof b.book_id === 'string' && typeof b.title === 'string')
+    .map((b) => {
+      if (b.publisher === undefined) return b; // 출판사는 없어도 됩니다 (예전 백업)
+      // 문자열이 아니거나 너무 길면 걸러 냅니다
+      const publisher =
+        typeof b.publisher === 'string' ? [...b.publisher].slice(0, LIMITS.publisher).join('') : '';
+      return { ...b, publisher };
+    });
   const transcriptions = parsed.transcriptions.filter(
     (t) =>
       t &&
@@ -112,10 +118,8 @@ function readingOrder(list) {
 
 export function buildMarkdown(book, list) {
   const lines = [`# ${book.title}`, ''];
-  lines.push(
-    `${book.author || '저자 미입력'} · 필사 ${list.length}개 · ${dotDate(new Date())} 내보냄`,
-    ''
-  );
+  const who = [book.author || '저자 미입력', book.publisher].filter(Boolean).join(' · ');
+  lines.push(`${who} · 필사 ${list.length}개 · ${dotDate(new Date())} 내보냄`, '');
   for (const t of readingOrder(list)) {
     const head = [kindText(t)];
     if (t.page) head.push(pageText(t));
@@ -132,7 +136,7 @@ export function buildMarkdown(book, list) {
 
 export function buildPlainText(book, list) {
   const lines = [
-    `${book.title}${book.author ? ` - ${book.author}` : ''}`,
+    `${book.title}${book.author ? ` - ${book.author}` : ''}${book.publisher ? ` (${book.publisher})` : ''}`,
     `필사 ${list.length}개`,
     '',
   ];
@@ -178,7 +182,7 @@ export function saveData(data) {
 
 // ───────────────── 입력 한도 ─────────────────
 // 필사 5,000자 / 메모 500자 / 책 제목 100자 / 저자 50자 / 사진 10MB (사진은 저장하지 않고 글자 인식에만 써요)
-export const LIMITS = { content: 5000, memo: 500, title: 100, author: 50, photoMB: 10 };
+export const LIMITS = { content: 5000, memo: 500, title: 100, author: 50, publisher: 50, photoMB: 10 };
 export const countChars = (s) => [...(s || '')].length;
 // 제목·저자 입력칸: 한도의 80%를 넘으면 글자 수를 보여 줍니다.
 export const showLimitCount = (s, max) => countChars(s) >= max * 0.8;

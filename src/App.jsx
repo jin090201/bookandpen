@@ -81,23 +81,26 @@ export default function App() {
     setUndo(null);
   };
 
-  const addBook = ({ title, author }) => {
+  const addBook = ({ title, author, publisher }) => {
     const book = {
       book_id: uid(),
       title: title.trim(),
       author: author.trim(),
+      publisher: (publisher || '').trim(),
       status: 'READING',
       created_at: new Date().toISOString(),
     };
     setData((d) => ({ ...d, books: [book, ...d.books] }));
   };
 
-  // 책 제목·저자 수정. 필사는 book_id로 이어져 있어서 제목을 바꿔도 그대로 연결됩니다.
-  const updateBookInfo = (bookId, { title, author }) => {
+  // 책 제목·저자·출판사 수정. 필사는 book_id로 이어져 있어서 제목을 바꿔도 그대로 연결됩니다.
+  const updateBookInfo = (bookId, { title, author, publisher }) => {
     setData((d) => ({
       ...d,
       books: d.books.map((b) =>
-        b.book_id === bookId ? { ...b, title: title.trim(), author: author.trim() } : b
+        b.book_id === bookId
+          ? { ...b, title: title.trim(), author: author.trim(), publisher: (publisher || '').trim() }
+          : b
       ),
     }));
   };
