@@ -1161,7 +1161,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
         <h3 className="mt-4 text-sm font-semibold text-stone-700">
           표지 색 <span className="font-normal text-stone-500">(연한 파스텔)</span>
         </h3>
-        <Hint>책장에 보이는 책 표지의 색 계열이에요.</Hint>
+        <Hint>{'책장에 보이는 책 표지의 색 계열이에요.\n책마다는 책 제목에 따라 여러 색이 섞여 나와요.'}</Hint>
         <div className="mt-2 grid grid-cols-4 gap-2">
           {COVER_OPTIONS.map((o) => (
             <ChoiceButton
