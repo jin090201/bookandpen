@@ -7,10 +7,10 @@
 브라우저 (모바일)
  ├─ React 앱 (Vite 번들)
  │   ├─ App.jsx ........ 상태(data)·화면 전환·데이터 변경 함수
- │   ├─ components/ .... BookList(책장·즐겨찾기·설정), BookDetail, ScanEditor, CropView(인식할 부분 자르기), CalendarView(독서 달력·내려받기), StatsView(통계),
+ │   ├─ components/ .... BookList(책장·즐겨찾기·설정), BookDetail, ScanEditor, CropView(인식할 부분 자르기), CalendarView(독서 달력·내려받기), StatsView(통계), SearchView(책장 검색의 필사 결과),
  │   │                    공통: Pager(목록 나누기), Chip(선택 칩)
  │   └─ lib/ ........... storage(저장·백업·설정·내보내기·종류 거르기·페이지 표기), date(날짜 표기), ocr, postprocess
- ├─ LocalStorage ....... 기록(reading-notes:v1), 설정(reading-notes:settings:v1), 달력 설정(reading-notes:calendar:v1), 마지막 백업 시각(reading-notes:backup:v1), 알림 띠를 닫은 시각(reading-notes:remind:v1)
+ ├─ LocalStorage ....... 기록(reading-notes:v1), 설정(reading-notes:settings:v1), 달력 설정(reading-notes:calendar:v1), 마지막 백업 시각(reading-notes:backup:v1), 알림 띠를 닫은 시각(reading-notes:remind:v1), 최근 검색어(reading-notes:search:v1)
  ├─ Tesseract.js ....... 브라우저 안 OCR (kor+eng)
  └─ (외부) 언어 데이터·구글 폰트 내려받기 (인터넷)
 서버 없음 → GitHub Pages가 정적 파일만 제공
@@ -30,7 +30,7 @@
 - 라우터 없이 `view`(books / detail / scan)와 `tab`(shelf / favorites / record / settings) 상태로 전환.
 - 모든 기록은 `App`의 `data` 하나에 두고, 바뀔 때마다 `saveData`로 저장. 저장 실패 시 상단에 경고 표시.
 - 설정은 `useSettings` 훅과 `updateSettings`(저장 + 즉시 적용 + 이벤트 알림)로 화면 간 공유.
-- 삭제 직전의 책·필사를 `undo` 상태에 7초간 보관하고, 되돌릴 때 id 기준으로 합칩니다(그 사이 바뀐 다른 기록은 건드리지 않습니다).
+- 삭제 직전의 책·필사를 `undo` 상태에 10초간 보관하고, 되돌릴 때 id 기준으로 합칩니다(그 사이 바뀐 다른 기록은 건드리지 않습니다).
 - 백업 알림은 `backupReminders`가 마지막 백업 후 30일 경과 또는 저장 공간 80% 이상일 때 안내 문구를 만들고, 설정에서 백업하면 이벤트로 알림 띠를 갱신합니다. 띠의 ✕를 누르면 닫은 시각을 저장해(`reading-notes:remind:v1`) 7일 동안 백업 문구를 숨기고, 저장 공간 경고는 닫을 수 없어 계속 표시합니다.
 
 ## 4. 주요 흐름
@@ -41,8 +41,8 @@
 | 항목 | 내용 | 완화 |
 |---|---|---|
 | 데이터 소실 | 브라우저 데이터 삭제 시 기록 사라짐 | 백업 내보내기·가져오기, 안내 문구 |
-| 용량 | LocalStorage 약 5MB | 텍스트만 저장, 저장 실패 경고, 입력 한도(본문 5,000자·메모 500자·사진 10MB), 80% 이상 사용 시 백업 알림 |
-| 실수로 삭제 | 확인 창 후에도 되돌리고 싶을 수 있음 | 삭제 직후 7초간 되돌리기 (모든 기록 삭제는 제외) |
+| 용량 | LocalStorage 약 5MB | 텍스트만 저장, 저장 실패 경고, 입력 한도(본문 5,000자·메모 500자·책 제목 100자·저자 50자·사진 10MB), 80% 이상 사용 시 백업 알림 |
+| 실수로 삭제 | 확인 창 후에도 되돌리고 싶을 수 있음 | 삭제 직후 10초간 되돌리기 (모든 기록 삭제는 제외) |
 | OCR 품질 | 곡면 페이지·흐린 사진, 뒷면 글자 비침·그림자, 영문 뒤에 붙은 한글 조사에서 오인식 | 해상도 2800px, 흑백·대비 보정, 인식할 부분 자르기, 폰 글자 복사 안내, 직접 수정 UI, 신뢰도가 낮은 단어 확인 목록(글자 하나가 비슷한 글자로 바뀐 오류는 엔진이 높은 신뢰도로 내놓아 잡지 못함) |
 | 외부 의존 | 첫 인식 때 언어 데이터 다운로드, 구글 폰트 | 이후 캐시, 폰트는 시스템 글꼴로 대체 |
 | CSS `zoom` | 손글씨 크기 보정에 사용. 필사 본문 글꼴이 나눔손글씨 펜일 때 제목·필사 본문에 1.25배가 적용되고(다른 글꼴은 1.0), 글자 크기 단계와 곱해집니다(보통 18px 기준 본문 22.5px, 제목 약 33.8px). 값은 `FONT_OPTIONS.pen.scale`에서 정하며 설정에 저장되지 않습니다 | 지원 안 하는 브라우저에서는 보정만 빠짐 |

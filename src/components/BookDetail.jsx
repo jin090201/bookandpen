@@ -5,6 +5,9 @@ import Pager, { usePaging } from './Pager.jsx';
 import { dotDate, fileStamp } from '../lib/date.js';
 import {
   KIND_LABEL,
+  LIMITS,
+  countChars,
+  showLimitCount,
   filterByKind,
   kindText,
   pageText,
@@ -51,8 +54,13 @@ export default function BookDetail({
   onToggleFavorite,
   onClearTranscriptions,
   onStatusChange,
+  onUpdateInfo, // ({ title, author }) => void
   onDeleteBook,
 }) {
+  const [shareMsg, setShareMsg] = useState(null); // 공유 대신 복사했을 때의 안내
+  const [infoEditing, setInfoEditing] = useState(false); // 제목·저자 수정 중
+  const [titleDraft, setTitleDraft] = useState('');
+  const [authorDraft, setAuthorDraft] = useState('');
   const [copied, setCopied] = useState(null); // { id, ok }
   const [expanded, setExpanded] = useState(() => new Set()); // 펼친 필사 id
   const [kindFilter, setKindFilter] = useState('all'); // all | quote | mine | none
@@ -119,6 +127,41 @@ export default function BookDetail({
     if (selecting) exitSelecting();
   };
 
+  // 공유: 기기의 공유 창(Web Share)으로 보냅니다. 지원하지 않는 브라우저(PC 등)에서는 복사합니다.
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const handleShare = async () => {
+    const list = selecting ? pickedList : transcriptions;
+    if (list.length === 0) return;
+    const text = buildPlainText(book, list);
+    if (canShare) {
+      try {
+        await navigator.share({ title: book.title, text });
+        if (selecting) exitSelecting();
+        return;
+      } catch (err) {
+        if (err?.name === 'AbortError') return; // 사용자가 공유 창을 닫음
+        // 그 밖의 실패는 아래 복사로 대신합니다.
+      }
+    }
+    const ok = await copyText(text);
+    setShareMsg(ok ? '필사를 복사했어요.' : '복사하지 못했어요.');
+    setTimeout(() => setShareMsg(null), 2000);
+    if (ok && selecting) exitSelecting();
+  };
+
+  // 읽기 기간 한 줄: 첫 필사 날짜부터 시작으로 보고, 완독이면 완독일을 보여 줍니다.
+  const periodText = (() => {
+    if (sorted.length === 0) return '아직 필사가 없어요';
+    const first = sorted[sorted.length - 1].created_at;
+    const parts = [`${dotDate(first)} 시작`];
+    if (book.status === 'COMPLETED' && book.completed_at) {
+      parts.push(`${dotDate(book.completed_at)} 완독`);
+    }
+    parts.push(`필사 ${sorted.length}개`);
+    if (book.status !== 'COMPLETED') parts.push(`마지막 ${dotDate(sorted[0].created_at)}`);
+    return parts.join(' · ');
+  })();
+
   return (
     <div className="px-4 pt-4">
       <div className="flex items-center justify-between">
@@ -130,52 +173,135 @@ export default function BookDetail({
         </button>
       </div>
 
-      <div className="mt-3">
-        <h1 className="font-body text-2xl font-bold">{book.title}</h1>
-        <p className="text-sm text-stone-500">{book.author || '저자 미입력'}</p>
-      </div>
-
-      <div className="mt-3 flex items-center gap-2">
-        <select
-          value={book.status}
-          onChange={(e) => onStatusChange(e.target.value)}
-          className="rounded-lg border border-stone-300 bg-white px-2 py-1.5 text-sm"
+      {infoEditing ? (
+        <form
+          className="mt-3 space-y-2 rounded-xl border border-stone-200 bg-white p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!titleDraft.trim()) return;
+            onUpdateInfo({ title: titleDraft, author: authorDraft });
+            setInfoEditing(false);
+          }}
         >
-          {Object.entries(STATUS_LABEL).map(([v, label]) => (
-            <option key={v} value={v}>
-              {label}
-            </option>
-          ))}
-        </select>
+          <input
+            value={titleDraft}
+            onChange={(e) => setTitleDraft(e.target.value)}
+            placeholder="책 제목 (필수)"
+            aria-label="책 제목"
+            maxLength={LIMITS.title}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-base outline-none focus:border-stone-500"
+          />
+          {showLimitCount(titleDraft, LIMITS.title) && (
+            <p className="text-right text-xs text-stone-500">
+              {countChars(titleDraft)} / {LIMITS.title}자
+            </p>
+          )}
+          <input
+            value={authorDraft}
+            onChange={(e) => setAuthorDraft(e.target.value)}
+            placeholder="저자"
+            aria-label="저자"
+            maxLength={LIMITS.author}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-base outline-none focus:border-stone-500"
+          />
+          {showLimitCount(authorDraft, LIMITS.author) && (
+            <p className="text-right text-xs text-stone-500">
+              {countChars(authorDraft)} / {LIMITS.author}자
+            </p>
+          )}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setInfoEditing(false)}
+              className="rounded-lg border border-stone-300 py-2 text-sm"
+            >
+              취소
+            </button>
+            <button
+              type="submit"
+              disabled={!titleDraft.trim()}
+              className="rounded-lg bg-accent py-2 text-sm font-medium text-on-accent disabled:bg-stone-300"
+            >
+              저장
+            </button>
+          </div>
+        </form>
+      ) : (
+        <div className="mt-3 min-w-0">
+          <h1 className="font-body text-2xl font-bold">{book.title}</h1>
+          <p className="text-sm text-stone-500">{book.author || '저자 미입력'}</p>
+          <p className="mt-1 text-xs text-stone-500">{periodText}</p>
+        </div>
+      )}
+
+      {/* 행 목록: 독서 상태, 책 정보 수정, 삭제(빨간색). 삭제는 모두 확인 창을 거칩니다. */}
+      <div className="mt-3 divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white text-sm">
+        <label className="relative flex items-center justify-between px-4 py-3">
+          <span>독서 상태</span>
+          <span className="flex items-center gap-1 font-medium text-accent">
+            {STATUS_LABEL[book.status]}
+            <span aria-hidden="true" className="text-stone-400">
+              ›
+            </span>
+          </span>
+          {/* 행 전체를 눌러도 기기의 선택 창이 열리도록 투명하게 덮어 둡니다. */}
+          <select
+            value={book.status}
+            onChange={(e) => onStatusChange(e.target.value)}
+            aria-label="독서 상태"
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          >
+            {Object.entries(STATUS_LABEL).map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        {!infoEditing && (
+          <button
+            onClick={() => {
+              setTitleDraft(book.title);
+              setAuthorDraft(book.author || '');
+              setInfoEditing(true);
+            }}
+            className="flex w-full items-center justify-between px-4 py-3 text-left"
+          >
+            <span>책 정보 수정</span>
+            <span aria-hidden="true" className="text-stone-400">
+              ›
+            </span>
+          </button>
+        )}
         {sorted.length > 0 && (
           <button
             onClick={() => {
               if (
                 window.confirm(
-                  `이 책의 필사 ${sorted.length}개를 모두 삭제할까요? 책은 그대로 남고, 되돌릴 수 없어요.`
+                  `이 책의 필사 ${sorted.length}개를 모두 삭제할까요? 책은 그대로 남아요. 삭제한 뒤 10초 안에는 되돌릴 수 있어요.`
                 )
               )
                 onClearTranscriptions();
             }}
-            className="ml-auto text-sm text-red-500"
+            className="flex w-full items-center justify-between px-4 py-3 text-left text-red-500"
           >
-            필사 전체 삭제
+            <span>필사 전체 삭제</span>
+            <span aria-hidden="true" className="text-red-300">
+              ›
+            </span>
           </button>
         )}
         <button
           onClick={() => {
-            if (
-              window.confirm(
-                '이 책과 모든 필사 기록을 삭제할까요? 되돌릴 수 없어요.'
-              )
-            )
+            if (window.confirm('이 책과 모든 필사 기록을 삭제할까요? 삭제한 뒤 10초 안에는 되돌릴 수 있어요.'))
               onDeleteBook();
           }}
-          className={`text-sm text-red-500 ${
-            sorted.length > 0 ? 'ml-3' : 'ml-auto'
-          }`}
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-red-500"
         >
-          책 삭제
+          <span>책 삭제</span>
+          <span aria-hidden="true" className="text-red-300">
+            ›
+          </span>
         </button>
       </div>
 
@@ -184,7 +310,7 @@ export default function BookDetail({
           필사 노트 ({sorted.length})
         </h2>
         {sorted.length > 0 && !selecting && (
-          <div className="ml-auto flex items-center gap-2 text-xs text-stone-500">
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-2 text-xs text-stone-500">
             <button
               onClick={() => setSelecting(true)}
               className="rounded-md border border-stone-300 bg-white px-2 py-1"
@@ -203,6 +329,12 @@ export default function BookDetail({
               className="rounded-md border border-stone-300 bg-white px-2 py-1"
             >
               .txt
+            </button>
+            <button
+              onClick={handleShare}
+              className="rounded-md border border-stone-300 bg-white px-2 py-1"
+            >
+              {canShare ? '공유' : '복사'}
             </button>
           </div>
         )}
@@ -229,11 +361,19 @@ export default function BookDetail({
           >
             .txt
           </button>
+          <button
+            onClick={handleShare}
+            disabled={pickedList.length === 0}
+            className="rounded-md border border-stone-300 bg-white px-2 py-1 disabled:opacity-40"
+          >
+            {canShare ? '공유' : '복사'}
+          </button>
           <button onClick={exitSelecting} className="ml-1 text-stone-500">
             취소
           </button>
         </div>
       )}
+      {shareMsg && <p className="mt-1 text-right text-xs text-stone-500">{shareMsg}</p>}
 
       {sorted.length > 0 && (
         <div className="mt-2 flex gap-2">
@@ -336,7 +476,7 @@ export default function BookDetail({
                   </button>
                   <button
                     onClick={() => {
-                      if (window.confirm('이 필사를 삭제할까요?'))
+                      if (window.confirm('이 필사를 삭제할까요? 삭제한 뒤 10초 안에는 되돌릴 수 있어요.'))
                         onDeleteTranscription(t.transcription_id);
                     }}
                     className="text-red-500"

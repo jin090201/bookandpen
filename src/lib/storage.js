@@ -177,9 +177,11 @@ export function saveData(data) {
 }
 
 // ───────────────── 입력 한도 ─────────────────
-// 필사 5,000자 / 메모 500자 / 사진 10MB (사진은 저장하지 않고 글자 인식에만 써요)
-export const LIMITS = { content: 5000, memo: 500, photoMB: 10 };
+// 필사 5,000자 / 메모 500자 / 책 제목 100자 / 저자 50자 / 사진 10MB (사진은 저장하지 않고 글자 인식에만 써요)
+export const LIMITS = { content: 5000, memo: 500, title: 100, author: 50, photoMB: 10 };
 export const countChars = (s) => [...(s || '')].length;
+// 제목·저자 입력칸: 한도의 80%를 넘으면 글자 수를 보여 줍니다.
+export const showLimitCount = (s, max) => countChars(s) >= max * 0.8;
 
 // ───────────────── 저장 공간·백업 알림 ─────────────────
 const STORAGE_BYTES = 5 * 1024 * 1024; // LocalStorage 약 5MB (브라우저는 글자당 2바이트로 셈)
@@ -233,6 +235,59 @@ export function getRemindClosedAt() {
 export function closeBackupReminder() {
   try {
     localStorage.setItem(REMIND_KEY, new Date().toISOString());
+  } catch {
+    /* 저장 실패는 무시 */
+  }
+}
+
+// ---- 최근 검색어 (책장 검색): 최대 5개, 최근 것이 맨 앞. 백업에는 포함하지 않습니다. ----
+const SEARCH_KEY = 'reading-notes:search:v1';
+const RECENT_MAX = 5;
+const RECENT_LEN = 30; // 검색어 한 개의 최대 글자 수
+
+export function loadRecentSearches() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SEARCH_KEY) || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .filter((s) => typeof s === 'string' && s.trim())
+      .map((s) => s.trim().slice(0, RECENT_LEN))
+      .slice(0, RECENT_MAX);
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentSearches(list) {
+  try {
+    localStorage.setItem(SEARCH_KEY, JSON.stringify(list));
+  } catch {
+    /* 저장 실패는 무시 */
+  }
+}
+
+// 같은 검색어는 맨 앞으로 옮기고, 5개를 넘으면 오래된 것부터 지웁니다. 새 목록을 돌려줍니다.
+export function addRecentSearch(term) {
+  const t = (term || '').trim().replace(/\s+/g, ' ').slice(0, RECENT_LEN);
+  if (!t) return loadRecentSearches();
+  const key = t.toLowerCase();
+  const next = [t, ...loadRecentSearches().filter((s) => s.toLowerCase() !== key)].slice(
+    0,
+    RECENT_MAX
+  );
+  saveRecentSearches(next);
+  return next;
+}
+
+export function removeRecentSearch(term) {
+  const next = loadRecentSearches().filter((s) => s !== term);
+  saveRecentSearches(next);
+  return next;
+}
+
+export function clearRecentSearches() {
+  try {
+    localStorage.removeItem(SEARCH_KEY);
   } catch {
     /* 저장 실패는 무시 */
   }
@@ -367,6 +422,7 @@ export const DEFAULT_SETTINGS = {
   round: 12,
   showDot: true,
   showBadge: true,
+  view: 'cover', // 책장 보기: cover(표지형) | list(목록형)
 };
 
 const has = (list, id) => list.some((o) => o.id === id);
@@ -390,6 +446,7 @@ export function loadSettings() {
     if (!has(ROUND_OPTIONS, s.round)) s.round = D.round;
     s.showDot = s.showDot !== false;
     s.showBadge = s.showBadge !== false;
+    if (s.view !== 'list') s.view = 'cover'; // 값이 없는 예전 설정은 표지형으로 읽습니다
     return s;
   } catch {
     return { ...DEFAULT_SETTINGS };

@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react';
+import Chip from './Chip.jsx';
 import Pager, { usePaging } from './Pager.jsx';
+import SearchView, { findTranscriptions } from './SearchView.jsx';
 import { dotDate, fileStamp } from '../lib/date.js';
 import {
   ACCENT_OPTIONS,
@@ -8,18 +10,25 @@ import {
   COVER_OPTIONS,
   FONT_OPTIONS,
   LETTER_OPTIONS,
+  LIMITS,
   ROUND_OPTIONS,
   SHADE_OPTIONS,
   SIZE_OPTIONS,
   THEME_OPTIONS,
   UI_FONT_IDS,
+  addRecentSearch,
   buildBackup,
+  clearRecentSearches,
+  countChars,
   coverColors,
   downloadTextFile,
   getLastBackup,
+  loadRecentSearches,
   markBackup,
   pageText,
   parseBackup,
+  removeRecentSearch,
+  showLimitCount,
   storageUsage,
   updateSettings,
   useSettings,
@@ -74,6 +83,12 @@ function CoverText({ title, author, mode, cols, small }) {
   );
 }
 
+// 목록형에서 쓰는 짧은 날짜: 올해면 "11.19", 다른 해면 "2025.12.03"
+function shortDate(iso) {
+  const full = dotDate(iso);
+  return full.slice(0, 4) === String(new Date().getFullYear()) ? full.slice(5) : full;
+}
+
 function daysAgo(iso) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / DAY);
   return d <= 0 ? '오늘' : `${d}일 전`;
@@ -86,7 +101,15 @@ export default function BookList({
   onAdd,
   onOpen,
   onDeleteBooks,
+  query, // 검색어(App이 들고 있어 책 상세·다른 탭에 다녀와도 유지됨)
+  setQuery,
+  scope, // 검색 범위: all(전체) | book(책) | tx(필사)
+  setScope,
+  txKind, // 필사 범위의 종류 필터: all | quote | mine | none
+  setTxKind,
 }) {
+  const [recent, setRecent] = useState(loadRecentSearches); // 최근 검색어
+  const [searchFocused, setSearchFocused] = useState(false);
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [showForm, setShowForm] = useState(false);
@@ -131,7 +154,14 @@ export default function BookList({
     status === 'ALL' ? books.length : books.filter((b) => b.status === status).length;
 
   const visible = useMemo(() => {
-    const list = books.filter((b) => filter === 'ALL' || b.status === filter);
+    // 검색어: 제목·저자에서 찾습니다. 띄어쓰기와 대소문자는 구분하지 않습니다.
+    const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
+    const q = norm(query);
+    const list = books.filter(
+      (b) =>
+        (filter === 'ALL' || b.status === filter) &&
+        (!q || norm(b.title).includes(q) || norm(b.author).includes(q))
+    );
     const lastOf = (b) => stats[b.book_id]?.last || b.created_at;
     const cmp = {
       recent: (a, b) => lastOf(b).localeCompare(lastOf(a)),
@@ -149,7 +179,34 @@ export default function BookList({
         (stats[b.book_id]?.count || 0) - (stats[a.book_id]?.count || 0),
     }[sort];
     return [...list].sort(cmp);
-  }, [books, filter, sort, stats]);
+  }, [books, filter, sort, stats, query]);
+
+  // ---- 검색: 책(제목·저자)과 필사(본문·메모)를 한 칸에서 찾습니다 ----
+  const hasQuery = query.trim() !== '';
+  const effScope = editMode ? 'book' : hasQuery ? scope : 'all'; // 편집 모드에서는 책만 보여 줍니다
+  const found = useMemo(() => findTranscriptions(transcriptions, query), [transcriptions, query]);
+  const bookMatchCount = useMemo(() => {
+    const norm = (s) => (s || '').toLowerCase().replace(/\s+/g, '');
+    const q = norm(query);
+    return q ? books.filter((b) => norm(b.title).includes(q) || norm(b.author).includes(q)).length : 0;
+  }, [books, query]);
+
+  // 최근 검색어는 엔터를 누르거나 결과를 눌러 이동할 때만 저장합니다(입력 도중에는 저장하지 않음).
+  const rememberSearch = () => {
+    if (hasQuery) setRecent(addRecentSearch(query));
+  };
+  const openBook = (id) => {
+    rememberSearch();
+    onOpen(id);
+  };
+  // 검색어를 모두 지우면 범위와 필사 종류도 처음(전체)으로 돌아갑니다.
+  const changeQuery = (v) => {
+    setQuery(v);
+    if (!v.trim()) {
+      setScope('all');
+      setTxKind('all');
+    }
+  };
 
   const toggleSelect = (id) =>
     setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
@@ -167,7 +224,7 @@ export default function BookList({
     if (selected.length === 0) return;
     if (
       window.confirm(
-        `선택한 책 ${selected.length}권과 모든 필사 기록을 삭제할까요? 되돌릴 수 없어요.`
+        `선택한 책 ${selected.length}권과 모든 필사 기록을 삭제할까요? 삭제한 뒤 10초 안에는 되돌릴 수 있어요.`
       )
     ) {
       onDeleteBooks(selected);
@@ -211,14 +268,26 @@ export default function BookList({
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="책 제목 (필수)"
+            maxLength={LIMITS.title}
             className="w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-stone-500"
           />
+          {showLimitCount(title, LIMITS.title) && (
+            <p className="text-right text-xs text-stone-500">
+              {countChars(title)} / {LIMITS.title}자
+            </p>
+          )}
           <input
             value={author}
             onChange={(e) => setAuthor(e.target.value)}
             placeholder="저자"
+            maxLength={LIMITS.author}
             className="w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-stone-500"
           />
+          {showLimitCount(author, LIMITS.author) && (
+            <p className="text-right text-xs text-stone-500">
+              {countChars(author)} / {LIMITS.author}자
+            </p>
+          )}
           <button
             type="submit"
             disabled={!title.trim()}
@@ -229,22 +298,112 @@ export default function BookList({
         </form>
       )}
 
-      <div className="mt-5 flex items-center justify-between border-b border-stone-200 pb-2">
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="bg-transparent text-sm font-semibold text-stone-800 outline-none"
+      {books.length > 0 && (
+        <form
+          className="mt-4"
+          onSubmit={(e) => {
+            e.preventDefault(); // 키보드의 검색(엔터)
+            rememberSearch();
+            e.currentTarget.querySelector('input')?.blur();
+          }}
         >
-          <option value="ALL">전체 {countOf('ALL')}</option>
-          {Object.entries(STATUS_LABEL).map(([v, label]) => (
-            <option key={v} value={v}>
-              {label} {countOf(v)}
-            </option>
+          <div className="relative">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => changeQuery(e.target.value)}
+              onFocus={() => setSearchFocused(true)}
+              onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
+              placeholder="책이나 필사에서 찾기"
+              aria-label="책과 필사 검색"
+              className="w-full rounded-xl border border-stone-300 bg-white py-2 pl-3 pr-10 text-base outline-none focus:border-stone-500"
+            />
+            {query && (
+              <button
+                type="button"
+                onClick={() => changeQuery('')}
+                aria-label="검색어 지우기"
+                className="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1 text-stone-400"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+          {/* 최근 검색어: 검색 칸을 눌렀고 아직 입력이 없을 때만 보입니다. */}
+          {searchFocused && !hasQuery && !editMode && recent.length > 0 && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-xs text-stone-500">
+                <span>최근 검색</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('최근 검색어를 모두 지울까요?')) {
+                      clearRecentSearches();
+                      setRecent([]);
+                    }
+                  }}
+                >
+                  모두 지우기
+                </button>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {recent.map((t) => (
+                  <span
+                    key={t}
+                    className="flex items-center rounded-full border border-stone-300 bg-white text-xs text-stone-600"
+                  >
+                    <button type="button" onClick={() => setQuery(t)} className="py-1 pl-3 pr-1.5">
+                      {t}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecent(removeRecentSearch(t))}
+                      aria-label={`${t} 지우기`}
+                      className="py-1 pl-0.5 pr-2.5 text-stone-400"
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </form>
+      )}
+
+      {/* 검색 범위 칩: 검색어가 있을 때만 보이고, 숫자는 결과 개수입니다. */}
+      {hasQuery && !editMode && (
+        <div className="mt-3 flex gap-1.5">
+          {[
+            ['all', '전체'],
+            ['book', `책 ${bookMatchCount}`],
+            ['tx', `필사 ${found.length}`],
+          ].map(([v, label]) => (
+            <Chip key={v} active={scope === v} onClick={() => setScope(v)}>
+              {label}
+            </Chip>
           ))}
-        </select>
+        </div>
+      )}
+
+      {/* 필사 범위에서는 책용 도구(상태 칩·정렬·보기 전환)를 숨깁니다. */}
+      {effScope !== 'tx' && (
+        <>
+      {/* 상태 칩: 한 줄로 늘어놓고 넘치면 옆으로 밀어서 봅니다. */}
+      <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
+        {[['ALL', '전체'], ...Object.entries(STATUS_LABEL)].map(([v, label]) => (
+          <span key={v} className="shrink-0">
+            <Chip active={filter === v} onClick={() => setFilter(v)}>
+              {label} {countOf(v)}
+            </Chip>
+          </span>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between border-b border-stone-200 pb-2">
         <select
           value={sort}
           onChange={(e) => setSort(e.target.value)}
+          aria-label="정렬"
           className="bg-transparent text-sm text-stone-600 outline-none"
         >
           {Object.entries(SORTS).map(([v, label]) => (
@@ -253,7 +412,30 @@ export default function BookList({
             </option>
           ))}
         </select>
+        {/* 보기 전환: 표지형 / 목록형 (선택은 화면 설정에 저장) */}
+        <div className="flex gap-1">
+          {[
+            ['cover', '▦', '표지형 보기'],
+            ['list', '☰', '목록형 보기'],
+          ].map(([v, icon, label]) => (
+            <button
+              key={v}
+              onClick={() => updateSettings({ view: v })}
+              aria-label={label}
+              aria-pressed={settings.view === v}
+              className={`rounded-md border px-2.5 py-1 text-sm ${
+                settings.view === v
+                  ? 'border-accent bg-accent text-on-accent'
+                  : 'border-stone-300 bg-white text-stone-500'
+              }`}
+            >
+              {icon}
+            </button>
+          ))}
+        </div>
       </div>
+        </>
+      )}
 
       {editMode && visible.length > 0 && (
         <div className="mt-2 flex items-center justify-between border-b border-stone-200 pb-2 text-sm">
@@ -264,7 +446,12 @@ export default function BookList({
         </div>
       )}
 
-      {books.length === 0 ? (
+      {/* "전체" 범위에서 검색 중이면 책 구역임을 표시합니다. */}
+      {effScope === 'all' && hasQuery && books.length > 0 && (
+        <h2 className="mt-4 text-sm font-semibold text-stone-700">책 ({visible.length})</h2>
+      )}
+
+      {effScope === 'tx' ? null : books.length === 0 ? (
         <div className="mt-8 rounded-xl border border-stone-200 bg-white p-5 text-center">
           <p className="font-body text-lg font-bold">첫 책을 등록해 보세요</p>
           <p className="mt-2 text-sm leading-relaxed text-stone-500">
@@ -284,8 +471,79 @@ export default function BookList({
         </div>
       ) : visible.length === 0 ? (
         <p className="mt-10 text-center text-sm text-stone-400">
-          이 상태의 책이 없어요.
+          {query.trim() ? '찾는 책이 없어요. 다른 글자로 찾아 보세요.' : '이 상태의 책이 없어요.'}
         </p>
+      ) : settings.view === 'list' ? (
+        <ul className="mt-4 space-y-2">
+          {visible.map((b) => {
+            const s = stats[b.book_id];
+            const lastIso = s?.last || b.created_at;
+            const isNew = Date.now() - new Date(lastIso).getTime() < 3 * DAY;
+            const checked = selected.includes(b.book_id);
+            return (
+              <li key={b.book_id}>
+                <button
+                  onClick={() => (editMode ? toggleSelect(b.book_id) : openBook(b.book_id))}
+                  className={`flex w-full items-center gap-3 rounded-xl border bg-white p-3 text-left ${
+                    checked ? 'border-accent' : 'border-stone-200'
+                  }`}
+                >
+                  {editMode && (
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-xs ${
+                        checked
+                          ? 'border-accent bg-accent text-on-accent'
+                          : 'border-stone-400 bg-white'
+                      }`}
+                    >
+                      {checked ? '✓' : ''}
+                    </span>
+                  )}
+                  {/* 작은 표지: 색은 표지 설정을 따르고, 글자는 제목의 첫 글자만 넣습니다. */}
+                  <div
+                    style={{
+                      ...coverColors(settings, b.title, rankOf[b.book_id] || 0),
+                      borderRadius: Math.min(settings.round, 10),
+                    }}
+                    className="relative flex aspect-[3/4] w-14 shrink-0 items-center justify-center shadow-sm"
+                  >
+                    <span className="font-body text-lg font-bold">{[...b.title][0]}</span>
+                    {settings.showDot && isNew && !editMode && (
+                      <span
+                        className="absolute left-1 top-1 h-2 w-2 rounded-full bg-dot"
+                        style={{ boxShadow: '0 0 0 1.5px rgba(255,255,255,0.8)' }}
+                      />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 font-body text-base font-semibold leading-snug">
+                      {b.title}
+                    </p>
+                    <p
+                      className={`mt-0.5 truncate text-sm ${
+                        b.author ? 'text-stone-500' : 'text-stone-400'
+                      }`}
+                    >
+                      {b.author || '저자 미입력'}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
+                      {settings.showBadge && (
+                        <span className={`rounded px-1.5 py-0.5 ${STATUS_STYLE[b.status]}`}>
+                          {STATUS_LABEL[b.status]}
+                        </span>
+                      )}
+                      <span>
+                        {s?.count
+                          ? `필사 ${s.count}개 · 마지막 ${shortDate(s.last)}`
+                          : '필사 없음'}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       ) : (
         <ul
           className={`mt-4 grid gap-3 ${
@@ -301,7 +559,7 @@ export default function BookList({
               <li key={b.book_id}>
                 <button
                   onClick={() =>
-                    editMode ? toggleSelect(b.book_id) : onOpen(b.book_id)
+                    editMode ? toggleSelect(b.book_id) : openBook(b.book_id)
                   }
                   className="block w-full text-left"
                 >
@@ -364,6 +622,20 @@ export default function BookList({
             );
           })}
         </ul>
+      )}
+
+      {/* 필사 결과: "전체" 범위에서는 3개 미리보기, "필사" 범위에서는 전체 목록 */}
+      {hasQuery && effScope !== 'book' && (
+        <SearchView
+          books={books}
+          found={found}
+          query={query}
+          kindFilter={txKind}
+          setKindFilter={setTxKind}
+          onOpen={openBook}
+          preview={effScope === 'all'}
+          onShowAll={() => setScope('tx')}
+        />
       )}
 
       {editMode && (
@@ -549,7 +821,7 @@ export function FavoritesView({
 const GUIDE = [
   {
     q: '1. 책 등록하기',
-    a: '책장 탭 오른쪽 위의 “+ 책 등록”을 누르고 제목을 입력한 뒤 “등록하기”를 누르세요.\n저자는 비워도 돼요.',
+    a: '책장 탭 오른쪽 위의 “+ 책 등록”을 누르고 제목을 입력한 뒤 “등록하기”를 누르세요.\n저자는 비워도 돼요.\n제목이나 저자를 잘못 썼다면 책을 열고 “책 정보 수정”에서 고칠 수 있어요.',
   },
   {
     q: '2. 사진으로 필사하기',
@@ -560,20 +832,20 @@ const GUIDE = [
     a: '필사 옆의 ☆를 누르면 ★가 되고 즐겨찾기 탭에 모여요.\n즐겨찾기 탭에서는 여러 개를 골라 한꺼번에 해제할 수도 있어요.',
   },
   {
-    q: '4. 책 정리하기',
-    a: '책장의 “편집”을 누르면 여러 권을 골라 삭제할 수 있고, “전체 선택”으로 한 번에 고를 수도 있어요.\n목록은 오른쪽 위에서 최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순으로 바꿔 볼 수 있어요.',
+    q: '4. 책 찾고 정리하기',
+    a: '책장 위의 칩으로 상태별(읽고 싶은, 읽는 중, 완독, 중단)로 거르고, 검색 칸에서 책 제목이나 저자, 필사 내용을 함께 찾을 수 있어요.\n검색어 아래의 칩(전체 · 책 · 필사)으로 찾을 범위를 바꾸고, 검색 칸을 누르면 최근 검색어가 보여요.\n정렬(최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순)은 칩 아래에서, 보기 방식(▦ 표지형 / ☰ 목록형)은 그 오른쪽에서 바꿔요.\n“편집”을 누르면 여러 권을 골라 삭제할 수 있고, “전체 선택”으로 한 번에 고를 수도 있어요.',
   },
   {
     q: '5. 표시의 뜻',
-    a: '표지 왼쪽 위의 회색 점은 3일 안에 필사한 책이에요. 세피아 테마에서는 갈색 톤의 진한 회색으로 보여요.\n오른쪽 아래 배지는 책의 읽기 상태(읽고 싶은, 읽는 중, 완독, 중단)예요.',
+    a: '표지 왼쪽 위의 회색 점은 3일 안에 필사한 책이에요. 세피아 테마에서는 갈색 톤의 진한 회색으로 보여요.\n오른쪽 아래 배지는 책의 읽기 상태(읽고 싶은, 읽는 중, 완독, 중단)예요.\n목록형에서는 점은 작은 표지에, 배지는 제목 아래에 보여요.',
   },
   {
     q: '6. 백업하기',
-    a: '기록은 이 기기의 브라우저에만 저장돼요. 브라우저 데이터를 지우면 사라져요.\n설정의 “데이터”에서 “내보내기”로 백업 파일을 가끔 내려받아 두세요. 다른 기기에서는 “가져오기”로 불러올 수 있어요.',
+    a: '기록은 이 기기의 브라우저에만 저장돼요. 브라우저 데이터를 지우면 사라져요.\n설정의 “데이터”에서 “내보내기”로 백업 파일을 가끔 내려받아 두세요. 다른 기기에서는 “가져오기”로 불러올 수 있어요.\n글자 크기, 색 같은 화면 설정은 백업에 들어가지 않아서, 다른 기기에서는 설정에서 다시 골라 주세요.',
   },
   {
     q: '7. 화면 바꾸기',
-    a: '글자 크기와 글꼴, 그리고 화면 구성 편집의 색 테마, 포인트 색, 표지 모양을 바꿀 수 있어요.\n바꾸면 바로 적용돼요.',
+    a: '글자 크기와 글꼴, 그리고 화면 구성 편집의 색 테마, 포인트 색, 표지 모양을 바꿀 수 있어요.\n바꾸면 바로 적용돼요.\n화면 구성 편집에는 미리보기가 위쪽에 붙어 있어서, 옵션을 바꾸면 바로 어떻게 보이는지 확인할 수 있어요.',
   },
   {
     q: '8. 설정 항목 접고 펼치기',
@@ -582,6 +854,10 @@ const GUIDE = [
   {
     q: '9. 잘못 읽은 글자 찾기',
     a: '인식이 끝나면 필사 내용 아래에 “잘못 읽었을 수 있는 글자”가 나올 수 있어요. 눌러 보면 본문에서 그 글자를 찾아 줘요.\n글자 하나가 비슷한 글자로 바뀐 경우(예: 도구→노구)는 표시되지 않으니 한 번 더 읽어 주세요.\n글자가 많이 깨지면 책을 평평하게 펴서 다시 찍거나, 폰의 글자 복사 기능을 써 보세요.',
+  },
+  {
+    q: '10. 필사 찾기와 내보내기',
+    a: '책장의 검색 칸에서 모든 책의 필사 내용과 메모를 찾을 수 있어요. 결과에서 “필사” 칩을 누르면 필사만 모아 볼 수 있고, 띄어쓰기와 대소문자는 구분하지 않아요.\n책을 열면 필사를 .md나 .txt 파일로 내려받거나, “공유”로 다른 앱에 보낼 수 있어요. PC에서는 “복사”로 보여요.',
   },
 ];
 
@@ -718,6 +994,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
       window.confirm('정말 모두 삭제할까요?')
     ) {
       onClearAll();
+      clearRecentSearches(); // 최근 검색어도 함께 지웁니다.
       setBackupMsg({ ok: true, text: '모든 기록을 삭제했어요.' });
     }
   };
@@ -938,7 +1215,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
             </div>
           </div>
         </div>
-        <Hint>카드 수는 책장에서 한 줄에 보이는 책 수, 모서리는 표지의 둥근 정도예요.</Hint>
+        <Hint>{'카드 수는 책장(표지형)에서 한 줄에 보이는 책 수, 모서리는 표지의 둥근 정도예요.\n목록형은 책장에서 ☰를 눌러 바꿔요.'}</Hint>
 
         <h3 className="mt-4 text-sm font-semibold text-stone-700">표시 항목</h3>
         <Hint>
@@ -1016,7 +1293,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
             개인정보 안내
           </summary>
           <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-            {'모든 기록은 이 기기의 브라우저에만 저장돼요.\n서버로 보내는 정보가 없고, 사진은 이 기기 안에서만 처리돼요.\n처음 글자를 인식할 때 언어 데이터를 내려받는 것 외에는 인터넷을 쓰지 않아요.'}
+            {'모든 기록은 이 기기의 브라우저에만 저장돼요. 최근 검색어도 마찬가지예요.\n서버로 보내는 정보가 없고, 사진은 이 기기 안에서만 처리돼요.\n처음 글자를 인식할 때 언어 데이터를 내려받는 것 외에는 인터넷을 쓰지 않아요.'}
           </p>
         </details>
         <details className="border-t border-stone-200 py-2">

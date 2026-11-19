@@ -28,6 +28,10 @@ export default function App() {
   const [view, setView] = useState({ name: 'books' });
   const [saveError, setSaveError] = useState(false);
   const [recordTab, setRecordTab] = useState('calendar'); // calendar | stats
+  // 책장 검색(책·필사)의 검색어·범위·종류 필터는 여기서 들고 있어 책 상세에 다녀와도 유지됩니다(앱을 닫으면 사라짐)
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState('all'); // all | book | tx
+  const [searchKind, setSearchKind] = useState('all'); // 필사 범위의 종류: all | quote | mine | none
   const [tab, setTab] = useState('shelf'); // shelf | favorites | record | settings
 
   const [usage, setUsage] = useState(storageUsage);
@@ -47,10 +51,10 @@ export default function App() {
     return () => window.removeEventListener(BACKUP_EVENT, onBackup);
   }, []);
 
-  // 삭제 취소 안내는 7초 뒤에 사라집니다
+  // 삭제 취소 안내는 10초 뒤에 사라집니다
   useEffect(() => {
     if (!undo) return undefined;
-    const timer = setTimeout(() => setUndo(null), 7000);
+    const timer = setTimeout(() => setUndo(null), 10000);
     return () => clearTimeout(timer);
   }, [undo]);
 
@@ -86,6 +90,16 @@ export default function App() {
       created_at: new Date().toISOString(),
     };
     setData((d) => ({ ...d, books: [book, ...d.books] }));
+  };
+
+  // 책 제목·저자 수정. 필사는 book_id로 이어져 있어서 제목을 바꿔도 그대로 연결됩니다.
+  const updateBookInfo = (bookId, { title, author }) => {
+    setData((d) => ({
+      ...d,
+      books: d.books.map((b) =>
+        b.book_id === bookId ? { ...b, title: title.trim(), author: author.trim() } : b
+      ),
+    }));
   };
 
   const updateBookStatus = (bookId, status) => {
@@ -256,6 +270,12 @@ export default function App() {
           onAdd={addBook}
           onOpen={(bookId) => setView({ name: 'book', bookId })}
           onDeleteBooks={deleteBooks}
+          query={searchQuery}
+          setQuery={setSearchQuery}
+          scope={searchScope}
+          setScope={setSearchScope}
+          txKind={searchKind}
+          setTxKind={setSearchKind}
         />
       )}
 
@@ -319,6 +339,7 @@ export default function App() {
           onToggleFavorite={toggleFavorite}
           onClearTranscriptions={() => clearTranscriptions(book.book_id)}
           onStatusChange={(s) => updateBookStatus(book.book_id, s)}
+          onUpdateInfo={(info) => updateBookInfo(book.book_id, info)}
           onDeleteBook={() => {
             deleteBook(book.book_id);
             setView({ name: 'books' });
