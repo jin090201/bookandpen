@@ -60,22 +60,47 @@ export function parseBackup(text) {
   ) {
     throw new Error('북앤펜 백업 파일(.json)만 가져올 수 있어요. 다른 앱의 파일은 불러올 수 없어요.');
   }
+  // 값이 빠졌거나 형식이 틀려도 앱이 깨지지 않도록, 없앨 수 없는 값은 고쳐서 받아들입니다.
+  // 날짜가 없거나 읽을 수 없으면 백업을 내보낸 시각(그것도 없으면 지금)으로 채웁니다.
+  const isIso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+  const fallbackIso = isIso(parsed.exported_at) ? parsed.exported_at : new Date().toISOString();
+  const cut = (v, max) => (typeof v === 'string' ? [...v].slice(0, max).join('') : '');
+  const STATUSES = ['WISH', 'READING', 'COMPLETED', 'STOPPED'];
+
   const books = parsed.books
     .filter((b) => b && typeof b.book_id === 'string' && typeof b.title === 'string')
     .map((b) => {
-      if (b.publisher === undefined) return b; // 출판사는 없어도 됩니다 (예전 백업)
-      // 문자열이 아니거나 너무 길면 걸러 냅니다
-      const publisher =
-        typeof b.publisher === 'string' ? [...b.publisher].slice(0, LIMITS.publisher).join('') : '';
-      return { ...b, publisher };
+      const fixed = {
+        ...b,
+        title: cut(b.title, LIMITS.title),
+        author: cut(b.author, LIMITS.author),
+        status: STATUSES.includes(b.status) ? b.status : 'READING',
+        created_at: isIso(b.created_at) ? b.created_at : fallbackIso,
+      };
+      if (b.publisher !== undefined) fixed.publisher = cut(b.publisher, LIMITS.publisher); // 출판사는 없어도 됩니다 (예전 백업)
+      if (b.completed_at !== undefined && !isIso(b.completed_at)) delete fixed.completed_at;
+      return fixed;
     });
-  const transcriptions = parsed.transcriptions.filter(
-    (t) =>
-      t &&
-      typeof t.transcription_id === 'string' &&
-      typeof t.book_id === 'string' &&
-      typeof t.content === 'string'
-  );
+  const transcriptions = parsed.transcriptions
+    .filter(
+      (t) =>
+        t &&
+        typeof t.transcription_id === 'string' &&
+        typeof t.book_id === 'string' &&
+        typeof t.content === 'string'
+    )
+    .map((t) => {
+      const pageNum = Number(t.page);
+      const fixed = {
+        ...t,
+        page: Number.isInteger(pageNum) && pageNum > 0 ? pageNum : null,
+        memo: cut(t.memo, LIMITS.memo),
+        favorite: t.favorite === true,
+        created_at: isIso(t.created_at) ? t.created_at : fallbackIso,
+      };
+      if (t.kinds !== undefined && !Array.isArray(t.kinds)) delete fixed.kinds;
+      return fixed;
+    });
   return { books, transcriptions };
 }
 
