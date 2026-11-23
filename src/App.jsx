@@ -6,6 +6,7 @@ import {
   getLastBackup,
   getRemindClosedAt,
   loadData,
+  mergeGoals,
   saveData,
   storageUsage,
   uid,
@@ -200,7 +201,7 @@ export default function App() {
   };
 
   // 가져오기: 기존 기록은 지우지 않고, 없는 항목만 합침(같은 id는 건너뜀)
-  const importBackup = ({ books, transcriptions }) => {
+  const importBackup = ({ books, transcriptions, goals }) => {
     const bookIds = new Set(data.books.map((b) => b.book_id));
     const tIds = new Set(data.transcriptions.map((t) => t.transcription_id));
     const newBooks = books.filter((b) => !bookIds.has(b.book_id));
@@ -212,7 +213,7 @@ export default function App() {
       books: [...newBooks, ...d.books],
       transcriptions: [...newTs, ...d.transcriptions],
     }));
-    return { books: newBooks.length, transcriptions: newTs.length };
+    return { books: newBooks.length, transcriptions: newTs.length, goals: mergeGoals(goals) };
   };
 
   const book =

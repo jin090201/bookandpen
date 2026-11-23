@@ -19,6 +19,7 @@ import {
   UI_FONT_IDS,
   addRecentSearch,
   buildBackup,
+  clearGoals,
   clearRecentSearches,
   countChars,
   coverColors,
@@ -1052,6 +1053,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
     ) {
       onClearAll();
       clearRecentSearches(); // 최근 검색어도 함께 지웁니다.
+      clearGoals(); // 올해 목표도 함께 지웁니다.
       setBackupMsg({ ok: true, text: '모든 기록을 삭제했어요.' });
     }
   };
@@ -1077,7 +1079,9 @@ export function SettingsView({ data, onImport, onClearAll }) {
       const added = onImport(parsed);
       setBackupMsg({
         ok: true,
-        text: `책 ${added.books}권, 필사 ${added.transcriptions}개를 가져왔어요. (이미 있던 기록은 그대로 두었어요)`,
+        text: `책 ${added.books}권, 필사 ${added.transcriptions}개${
+          added.goals > 0 ? `, 목표 ${added.goals}개` : ''
+        }를 가져왔어요. (이미 있던 기록은 그대로 두었어요)`,
       });
     } catch (err) {
       setBackupMsg({ ok: false, text: err.message });

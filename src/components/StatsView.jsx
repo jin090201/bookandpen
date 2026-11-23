@@ -3,6 +3,7 @@ import { KIND_LABEL, filterByKind } from '../lib/storage.js';
 import { dayKey, pad } from '../lib/date.js';
 import { DayList, MonthPicker, groupByDay, loadCalSettings, weekdayNames } from './CalendarView.jsx';
 import Chip from './Chip.jsx';
+import GoalCard from './GoalCard.jsx';
 
 const num = (n) => n.toLocaleString('ko-KR');
 const chars = (list) => list.reduce((n, t) => n + [...t.content].length, 0);
@@ -49,6 +50,8 @@ export default function StatsView({ books, transcriptions }) {
         <Card label="글자 수" value={`${num(chars(transcriptions))}자`} />
         <Card label="완독한 책" value={`${num(completed)}권`} />
       </div>
+
+      <GoalCard books={books} />
 
       <div className="mt-5 grid grid-cols-3 border-b border-stone-200 text-sm">
         {[['day', '일간 통계'], ['month', '월간 통계'], ['year', '연간 통계']].map(([k, label]) => (
@@ -106,6 +109,9 @@ function DayStats({ books, transcriptions }) {
   });
   const keyOf = dayKey;
   const selKey = keyOf(selected);
+  // 미래는 볼 수 없으므로, 오늘이 든 주에서는 다음 주로 못 가고 오늘 이후 날짜는 누를 수 없습니다.
+  const todayKey = keyOf(new Date());
+  const weekHasToday = week.some((d) => keyOf(d) >= todayKey);
   const items = byDay[selKey] || [];
   const moveWeek = (delta) => {
     const d = new Date(selected);
@@ -134,7 +140,14 @@ function DayStats({ books, transcriptions }) {
           {selected.getFullYear()}년 {selected.getMonth() + 1}월{' '}
           <span className="text-xs text-stone-400">{picking ? '▴' : '▾'}</span>
         </button>
-        <button onClick={() => moveWeek(1)} aria-label="다음 주" className="px-3 py-1 text-lg text-stone-600">›</button>
+        <button
+          onClick={() => moveWeek(1)}
+          disabled={weekHasToday}
+          aria-label="다음 주"
+          className="px-3 py-1 text-lg text-stone-600 disabled:opacity-30"
+        >
+          ›
+        </button>
       </div>
       {picking && (
         <MonthPicker
@@ -144,6 +157,7 @@ function DayStats({ books, transcriptions }) {
           marked={markedMonths}
           onPick={pickMonth}
           onClose={() => setPicking(false)}
+          noFuture
         />
       )}
 
@@ -156,7 +170,8 @@ function DayStats({ books, transcriptions }) {
             <button
               key={k}
               onClick={() => setSelected(d)}
-              className={`rounded-lg py-1.5 ${on ? 'bg-accent text-on-accent' : 'text-stone-700'}`}
+              disabled={k > todayKey}
+              className={`rounded-lg py-1.5 disabled:opacity-30 ${on ? 'bg-accent text-on-accent' : 'text-stone-700'}`}
             >
               <span className="block text-xs opacity-70">{names[i]}</span>
               <span className="block text-sm font-medium">{d.getDate()}</span>
@@ -200,6 +215,9 @@ function MonthStats({ books, transcriptions, cur, setCur }) {
     (b) => b.status === 'COMPLETED' && b.completed_at && dayKey(b.completed_at).startsWith(ym)
   ).length;
 
+  // 미래는 볼 수 없으므로 이번 달(또는 그 이후)에서는 다음 달로 못 갑니다.
+  const nowD = new Date();
+  const isThisMonth = cur.y * 12 + cur.m >= nowD.getFullYear() * 12 + nowD.getMonth();
   const move = (delta) => {
     const d = new Date(cur.y, cur.m + delta, 1);
     setCur({ y: d.getFullYear(), m: d.getMonth() });
@@ -223,7 +241,14 @@ function MonthStats({ books, transcriptions, cur, setCur }) {
         >
           {cur.y}년 {cur.m + 1}월 <span className="text-xs text-stone-400">{picking ? '▴' : '▾'}</span>
         </button>
-        <button onClick={() => move(1)} aria-label="다음 달" className="px-3 py-1 text-lg text-stone-600">›</button>
+        <button
+          onClick={() => move(1)}
+          disabled={isThisMonth}
+          aria-label="다음 달"
+          className="px-3 py-1 text-lg text-stone-600 disabled:opacity-30"
+        >
+          ›
+        </button>
       </div>
       {picking && (
         <MonthPicker
@@ -233,6 +258,7 @@ function MonthStats({ books, transcriptions, cur, setCur }) {
           marked={markedMonths}
           onPick={pick}
           onClose={() => setPicking(false)}
+          noFuture
         />
       )}
 
@@ -272,11 +298,11 @@ function MonthStats({ books, transcriptions, cur, setCur }) {
   );
 }
 
-// ───────────────── 연도 고르기 창 (올해 기준 앞뒤 5년) ─────────────────
+// ───────────────── 연도 고르기 창 (올해 기준 과거 5년과 올해, 미래는 없음) ─────────────────
 const YEAR_RANGE = 5;
 
 function YearPicker({ year, thisYear, marked, onPick, onClose }) {
-  const years = Array.from({ length: YEAR_RANGE * 2 + 1 }, (_, i) => thisYear - YEAR_RANGE + i);
+  const years = Array.from({ length: YEAR_RANGE + 1 }, (_, i) => thisYear - YEAR_RANGE + i);
   return (
     <div className="mx-auto mt-2 max-w-sm rounded-xl border border-stone-200 bg-white p-3">
       <div className="grid grid-cols-4 gap-2">
@@ -316,7 +342,7 @@ function YearPicker({ year, thisYear, marked, onPick, onClose }) {
 function YearStats({ books, transcriptions, onOpenMonth }) {
   const now = new Date();
   const thisYear = now.getFullYear();
-  const maxYear = thisYear + YEAR_RANGE; // 앞으로 5년까지만 이동합니다
+  const maxYear = thisYear; // 미래 연도로는 이동하지 않습니다
   const [year, setYear] = useState(thisYear);
   const [picking, setPicking] = useState(false); // 연도 고르기 창이 열려 있는지
 

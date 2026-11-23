@@ -35,6 +35,7 @@ export function buildBackup(data) {
       exported_at: new Date().toISOString(),
       books: data.books,
       transcriptions: data.transcriptions,
+      goals: loadGoals(), // 올해 완독 목표 (연도: 권수)
     },
     null,
     2
@@ -101,7 +102,71 @@ export function parseBackup(text) {
       if (t.kinds !== undefined && !Array.isArray(t.kinds)) delete fixed.kinds;
       return fixed;
     });
-  return { books, transcriptions };
+  // 목표는 예전 백업에는 없으므로 없어도 됩니다.
+  return { books, transcriptions, goals: cleanGoals(parsed.goals) };
+}
+
+// ───────────────── 올해 완독 목표 (연도별 권수, 백업에 포함) ─────────────────
+const GOAL_KEY = 'reading-notes:goal:v1';
+export const GOAL_MAX = 999;
+
+// { "2026": 12 } 형태만 받아들입니다. 연도는 4자리, 권수는 1~999의 정수여야 합니다.
+function cleanGoals(v) {
+  const out = {};
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return out;
+  for (const [year, count] of Object.entries(v)) {
+    const n = Number(count);
+    if (/^\d{4}$/.test(year) && Number.isInteger(n) && n >= 1 && n <= GOAL_MAX) out[year] = n;
+  }
+  return out;
+}
+
+export function loadGoals() {
+  try {
+    return cleanGoals(JSON.parse(localStorage.getItem(GOAL_KEY) || '{}'));
+  } catch {
+    return {};
+  }
+}
+
+function writeGoals(goals) {
+  try {
+    localStorage.setItem(GOAL_KEY, JSON.stringify(goals));
+  } catch {
+    /* 저장 실패는 무시 */
+  }
+}
+
+// 그 해의 목표를 정합니다. 0이거나 비어 있으면 목표를 없앱니다. 바뀐 목표 전체를 돌려줍니다.
+export function saveGoal(year, count) {
+  const goals = loadGoals();
+  const n = Number(count);
+  if (Number.isInteger(n) && n >= 1 && n <= GOAL_MAX) goals[String(year)] = n;
+  else delete goals[String(year)];
+  writeGoals(goals);
+  return goals;
+}
+
+// 가져오기: 이미 목표가 있는 해는 그대로 두고, 없는 해만 합칩니다. 새로 들어온 개수를 돌려줍니다.
+export function mergeGoals(incoming) {
+  const goals = loadGoals();
+  let added = 0;
+  for (const [year, count] of Object.entries(cleanGoals(incoming))) {
+    if (goals[year] === undefined) {
+      goals[year] = count;
+      added += 1;
+    }
+  }
+  if (added > 0) writeGoals(goals);
+  return added;
+}
+
+export function clearGoals() {
+  try {
+    localStorage.removeItem(GOAL_KEY);
+  } catch {
+    /* 저장 실패는 무시 */
+  }
 }
 
 // ---- 필사 종류: 책 문장 / 내 글 (함께 선택 가능, 선택 안 하면 미분류) ----

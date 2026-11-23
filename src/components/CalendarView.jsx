@@ -104,15 +104,25 @@ export function DayList({ items, titleOf }) {
 
 // ───────────────── 연·월 고르기 창 (달력 제목을 누르면 열립니다) ─────────────────
 // year/month: 지금 보는 연·월(month는 0~11), marked: 기록이 있는 달의 "YYYY-MM" 모음
-export function MonthPicker({ year, month, marked, onPick, onClose }) {
+// noFuture: true이면 이번 달 이후(미래)는 고를 수 없습니다.
+export function MonthPicker({ year, month, marked, onPick, onClose, noFuture = false }) {
   const [y, setY] = useState(year);
   const now = new Date();
+  const isFuture = (yy, mm) =>
+    noFuture && (yy > now.getFullYear() || (yy === now.getFullYear() && mm > now.getMonth()));
   return (
     <div className="mx-auto mt-2 max-w-sm rounded-xl border border-stone-200 bg-white p-3">
       <div className="flex items-center justify-between">
         <button onClick={() => setY(y - 1)} aria-label="이전 해" className="px-3 py-1 text-lg text-stone-600">‹</button>
         <p className="text-sm font-semibold">{y}년</p>
-        <button onClick={() => setY(y + 1)} aria-label="다음 해" className="px-3 py-1 text-lg text-stone-600">›</button>
+        <button
+          onClick={() => setY(y + 1)}
+          disabled={noFuture && y >= now.getFullYear()}
+          aria-label="다음 해"
+          className="px-3 py-1 text-lg text-stone-600 disabled:opacity-30"
+        >
+          ›
+        </button>
       </div>
       <div className="mt-2 grid grid-cols-4 gap-2">
         {Array.from({ length: 12 }, (_, m) => {
@@ -123,8 +133,9 @@ export function MonthPicker({ year, month, marked, onPick, onClose }) {
             <button
               key={m}
               onClick={() => onPick(y, m)}
+              disabled={isFuture(y, m)}
               aria-label={`${y}년 ${m + 1}월${has ? ' 필사 있음' : ''}`}
-              className={`relative rounded-lg py-2 text-sm ${
+              className={`relative rounded-lg py-2 text-sm disabled:opacity-30 ${
                 on ? 'bg-accent text-on-accent' : 'border border-stone-200 text-stone-700'
               } ${!on && isNow ? 'ring-1 ring-stone-400' : ''}`}
             >
