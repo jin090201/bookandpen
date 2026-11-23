@@ -39,7 +39,8 @@ export default function StatsView({ books, transcriptions }) {
     return { y: d.getFullYear(), m: d.getMonth() };
   });
   const total = transcriptions.length;
-  const completed = books.filter((b) => b.status === 'COMPLETED').length;
+  // 목표·월간·연간 통계와 같은 기준입니다: 완독 날짜(completed_at)가 있는 완독 책만 셉니다.
+  const completed = books.filter((b) => b.status === 'COMPLETED' && b.completed_at).length;
 
   return (
     <div className="px-4 pt-6">
@@ -344,6 +345,7 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
   const now = new Date();
   const thisYear = now.getFullYear();
   const maxYear = thisYear; // 미래 연도로는 이동하지 않습니다
+  const minYear = thisYear - YEAR_RANGE; // 연도 고르기 창과 같이 과거 5년까지만 이동합니다
   // 올해에서 아직 오지 않은 달은 월간 통계로 열 수 없습니다.
   const isFutureMonth = (i) => year > thisYear || (year === thisYear && i > now.getMonth());
   const [year, setYear] = useState(thisYear);
@@ -380,7 +382,14 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
   return (
     <div className="mt-4">
       <div className="flex items-center justify-between">
-        <button onClick={() => setYear((y) => y - 1)} aria-label="이전 해" className="px-3 py-1 text-lg text-stone-600">‹</button>
+        <button
+          onClick={() => setYear((y) => Math.max(y - 1, minYear))}
+          disabled={year <= minYear}
+          aria-label="이전 해"
+          className="px-3 py-1 text-lg text-stone-600 disabled:opacity-30"
+        >
+          ‹
+        </button>
         <button
           onClick={() => setPicking((v) => !v)}
           aria-expanded={picking}

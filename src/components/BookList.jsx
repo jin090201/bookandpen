@@ -1365,7 +1365,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
             개인정보 안내
           </summary>
           <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-            <RichText text={'모든 기록은 **이 기기의 브라우저에만** 저장돼요.\n**서버로 보내는 정보가 없고**, 사진은 이 기기 안에서만 처리돼요.\n처음 글자를 인식할 때 언어 데이터를 내려받는 것 외에는 인터넷을 쓰지 않아요.'} />
+            <RichText text={'모든 기록은 **이 기기의 브라우저에만** 저장돼요.\n**서버로 보내는 정보가 없고**, 사진은 이 기기 안에서만 처리돼요.\n다만 앱을 열 때 글꼴(Google Fonts)을, 글자를 인식할 때 인식 엔진과 언어 데이터(jsdelivr)를 인터넷에서 내려받아요. 이때 기록이나 사진은 보내지 않지만, 해당 서비스에는 접속 기록(IP 주소 등)이 남을 수 있어요.'} />
           </p>
           <Note kind="tip" text="최근 검색어도 이 기기에만 저장되고, 백업에는 들어가지 않아요." />
         </details>

@@ -8,7 +8,8 @@ export function postprocess(raw) {
   text = text.replace(/([A-Za-z])-\n([a-z])/g, '$1$2');
 
   // 2) 단락 내 강제 줄바꿈을 공백으로 치환 (빈 줄=단락 구분은 유지)
-  text = text.replace(/(?<!\n)\n(?!\n)/g, ' ');
+  // (후방 탐색 (?<!\n)은 iOS 16.3 이하 사파리에서 오류가 나므로 쓰지 않습니다.)
+  text = text.replace(/([^\n])\n(?!\n)/g, '$1 ');
 
   // 3) 연속 공백/탭 하나로
   text = text.replace(/[ \t ]{2,}/g, ' ');

@@ -8,6 +8,7 @@ import { uid, KIND_LABEL, kindsOf, LIMITS, countChars } from '../lib/storage.js'
 import { dayKey } from '../lib/date.js';
 
 const MAX_CHIPS = 10;
+const PAGE_DIGITS = 5; // 페이지는 최대 5자리(99999)까지 입력합니다.
 
 // 입력칸은 선택한 글자가 안 보이는 위치에 있어도 스스로 스크롤하지 않으므로, 같은 모양의 숨은 칸에서 그 글자의 세로 위치를 재어 맞춰 줍니다.
 function scrollToWord(ta, idx, len) {
@@ -353,7 +354,8 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
         ))}
         <input
           value={page}
-          onChange={(e) => setPage(e.target.value.replace(/[^0-9]/g, ''))}
+          onChange={(e) => setPage(e.target.value.replace(/[^0-9]/g, '').slice(0, PAGE_DIGITS))}
+          maxLength={PAGE_DIGITS}
           inputMode="numeric"
           placeholder="페이지"
           aria-label="페이지"
