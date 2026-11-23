@@ -162,6 +162,7 @@ export async function recognizeImage(file, onProgress, crop = null) {
     }
     return { text: data.text || '', doubtful };
   } finally {
-    currentProgress = null;
+    // 그 사이 다른 인식이 시작됐다면 그쪽의 진행 표시를 지우지 않습니다.
+    if (currentProgress === onProgress) currentProgress = null;
   }
 }

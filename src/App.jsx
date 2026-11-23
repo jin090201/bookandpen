@@ -4,6 +4,7 @@ import {
   backupReminders,
   closeBackupReminder,
   getLastBackup,
+  DATA_KEY,
   getRemindClosedAt,
   hasCorruptCopy,
   loadData,
@@ -94,6 +95,16 @@ export default function App() {
     setSaveError(!saveData(data));
     setUsage(storageUsage());
   }, [data]);
+
+  // 다른 탭에서 기록이 바뀌면 이 탭도 최신 기록을 읽어 옵니다(그대로 두면 나중에 저장한 탭이 앞의 변경을 덮어씁니다).
+  // 값이 같으면 브라우저가 이벤트를 보내지 않으므로, 읽어 와서 다시 저장해도 서로 계속 주고받지 않습니다.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === DATA_KEY || e.key === null) setData(loadData());
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // 설정에서 백업을 내려받으면 마지막 백업 시각을 새로 읽습니다
   useEffect(() => {

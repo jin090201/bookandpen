@@ -2,6 +2,7 @@
 import { dotDate } from './date.js';
 
 const KEY = 'reading-notes:v1';
+export const DATA_KEY = KEY; // 다른 탭의 변경을 알아차릴 때 어떤 키인지 비교하는 데 씁니다.
 
 export function uid() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -81,13 +82,24 @@ export function parseBackup(text) {
   }
   // 값이 빠졌거나 형식이 틀려도 앱이 깨지지 않도록, 없앨 수 없는 값은 고쳐서 받아들입니다.
   // 날짜가 없거나 읽을 수 없으면 백업을 내보낸 시각(그것도 없으면 지금)으로 채웁니다.
-  const isIso = (v) => typeof v === 'string' && !Number.isNaN(Date.parse(v));
+  // 없는 날짜(2026-02-30 등)는 Date가 다음 달로 넘겨 읽으므로, 앞쪽 연-월-일이 실제로 있는 날인지 따로 확인합니다.
+  const isIso = (v) => {
+    if (typeof v !== 'string' || Number.isNaN(Date.parse(v))) return false;
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+    if (!m) return true;
+    const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+    return mo >= 1 && mo <= 12 && d >= 1 && d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
+  };
   const fallbackIso = isIso(parsed.exported_at) ? parsed.exported_at : new Date().toISOString();
   const cut = (v, max) => (typeof v === 'string' ? [...v].slice(0, max).join('') : '');
   const STATUSES = ['WISH', 'READING', 'COMPLETED', 'STOPPED'];
 
+  // 파일 안에 같은 id가 여러 번 있으면 맨 앞의 것만 받습니다(목록의 key가 겹치지 않게).
+  const seenBooks = new Set();
+  const seenTs = new Set();
   const books = parsed.books
     .filter((b) => b && typeof b.book_id === 'string' && typeof b.title === 'string')
+    .filter((b) => !seenBooks.has(b.book_id) && !!seenBooks.add(b.book_id))
     .map((b) => {
       const fixed = {
         ...b,
@@ -106,8 +118,10 @@ export function parseBackup(text) {
         t &&
         typeof t.transcription_id === 'string' &&
         typeof t.book_id === 'string' &&
-        typeof t.content === 'string'
+        typeof t.content === 'string' &&
+        t.content.trim() !== '' // 본문이 비었거나 공백뿐이면 빈 카드가 생기므로 받지 않습니다
     )
+    .filter((t) => !seenTs.has(t.transcription_id) && !!seenTs.add(t.transcription_id))
     .map((t) => {
       const pageNum = Number(t.page);
       const fixed = {
@@ -117,7 +131,11 @@ export function parseBackup(text) {
         favorite: t.favorite === true,
         created_at: isIso(t.created_at) ? t.created_at : fallbackIso,
       };
-      if (t.kinds !== undefined && !Array.isArray(t.kinds)) delete fixed.kinds;
+      // 종류는 알려진 값(책 문장·내 글)만 남기고 겹치는 값은 하나로 합칩니다. 배열이 아니면 없는 것으로 봅니다.
+      if (Array.isArray(t.kinds)) {
+        const known = Object.keys(KIND_LABEL);
+        fixed.kinds = [...new Set(t.kinds.filter((k) => known.includes(k)))];
+      } else if (t.kinds !== undefined) delete fixed.kinds;
       return fixed;
     });
   // 목표는 예전 백업에는 없으므로 없어도 됩니다.
