@@ -42,7 +42,7 @@ function scrollToWord(ta, idx, len) {
   ta.scrollTop = Math.max(0, top - Math.max(0, ta.clientHeight / 3 - lineH / 2));
 }
 
-export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) {
+export default function ScanEditor({ book, editing, onCancel, onHome, onSave, leaveGuardRef }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -73,6 +73,26 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave }) 
 
   const cameraRef = useRef(null);
   const fileRef = useRef(null);
+
+  // 쓰던 내용이 있으면(새 필사는 입력한 것이 있을 때, 수정은 바뀐 것이 있을 때) 나가기 전에 확인합니다.
+  // 취소 버튼·첫 화면·브라우저 뒤로가기 모두 App의 뒤로가기 처리에서 이 함수를 거칩니다.
+  const sameKinds = (a, b) => a.length === b.length && a.every((k) => b.includes(k));
+  const dirty = editing
+    ? content !== editing.content ||
+      memo !== (editing.memo ?? '') ||
+      page !== (editing.page ? String(editing.page) : '') ||
+      day !== dayKey(editing.created_at) ||
+      !sameKinds(kinds, kindsOf(editing))
+    : content.trim() !== '' || memo.trim() !== '' || page !== '';
+  useEffect(() => {
+    if (!leaveGuardRef) return undefined;
+    leaveGuardRef.current = dirty
+      ? () => window.confirm('쓰던 내용이 사라져요. 저장하지 않고 나갈까요?')
+      : null;
+    return () => {
+      leaveGuardRef.current = null;
+    };
+  }, [dirty, leaveGuardRef]);
 
   useEffect(() => {
     return () => {

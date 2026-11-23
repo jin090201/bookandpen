@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BACKUP_EVENT,
   backupReminders,
   closeBackupReminder,
   getLastBackup,
   getRemindClosedAt,
+  hasCorruptCopy,
   loadData,
   mergeGoals,
   saveData,
@@ -39,6 +40,55 @@ export default function App() {
   const [lastBackup, setLastBackup] = useState(getLastBackup);
   const [remindClosedAt, setRemindClosedAt] = useState(getRemindClosedAt);
   const [undo, setUndo] = useState(null); // { label, removed: { books, transcriptions } }
+  // 저장된 데이터를 읽지 못해 원본을 따로 보관했는지 (처음 열 때 한 번 확인)
+  const [corruptNotice, setCorruptNotice] = useState(hasCorruptCopy);
+
+  // ---- 화면 이동과 브라우저(안드로이드) 뒤로가기 연결 ----
+  // 책 상세·필사 화면으로 들어갈 때 기록을 쌓고, 뒤로가기는 한 단계 앞 화면으로 돌아갑니다.
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  // 필사 화면이 "쓰던 내용이 있으니 나가기 전에 확인하라"고 알려 주는 함수입니다(없으면 그냥 나감).
+  const leaveGuardRef = useRef(null);
+  const depthOf = (v) => (v.name === 'scan' ? 2 : v.name === 'book' ? 1 : 0);
+
+  useEffect(() => {
+    try {
+      window.history.replaceState({ view: { name: 'books' } }, '');
+    } catch {
+      /* 무시 */
+    }
+    const onPop = (e) => {
+      const cur = viewRef.current;
+      // 쓰던 내용을 버리고 나가는지 확인하고, 취소하면 필사 화면의 기록을 다시 쌓아 머뭅니다.
+      if (cur.name === 'scan' && leaveGuardRef.current && !leaveGuardRef.current()) {
+        try {
+          window.history.pushState({ view: cur }, '');
+        } catch {
+          /* 무시 */
+        }
+        return;
+      }
+      setView(e.state?.view || { name: 'books' });
+    };
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  const navigate = (next) => {
+    try {
+      window.history.pushState({ view: next }, '');
+    } catch {
+      /* 무시 */
+    }
+    setView(next);
+  };
+  const goBack = () => window.history.back();
+  // 첫 화면(책장)까지 한 번에 돌아갑니다.
+  const goHome = () => {
+    setTab('shelf');
+    const depth = depthOf(viewRef.current);
+    if (depth > 0) window.history.go(-depth);
+  };
 
   useEffect(() => {
     setSaveError(!saveData(data));
@@ -228,6 +278,17 @@ export default function App() {
         </div>
       )}
 
+      {corruptNotice && (
+        <div className="flex items-center gap-2 bg-red-100 px-4 py-2 text-sm text-red-700">
+          <span className="flex-1">
+            저장된 기록을 읽지 못해서 빈 상태로 열렸어요. 깨진 원본은 이 기기에 따로 보관해 두었어요.
+          </span>
+          <button onClick={() => setCorruptNotice(false)} aria-label="안내 닫기" className="px-1">
+            ✕
+          </button>
+        </div>
+      )}
+
       {view.name === 'books' && (() => {
         const { backup, space } = backupReminders(data, lastBackup, usage, remindClosedAt);
         const reasons = [...backup, ...space];
@@ -272,7 +333,7 @@ export default function App() {
           books={data.books}
           transcriptions={data.transcriptions}
           onAdd={addBook}
-          onOpen={(bookId) => setView({ name: 'book', bookId })}
+          onOpen={(bookId) => navigate({ name: 'book', bookId })}
           onDeleteBooks={deleteBooks}
           query={searchQuery}
           setQuery={setSearchQuery}
@@ -287,7 +348,7 @@ export default function App() {
         <FavoritesView
           books={data.books}
           transcriptions={data.transcriptions}
-          onOpen={(bookId) => setView({ name: 'book', bookId })}
+          onOpen={(bookId) => navigate({ name: 'book', bookId })}
           onToggleFavorite={toggleFavorite}
           onUnfavorite={unfavoriteMany}
         />
@@ -330,14 +391,11 @@ export default function App() {
           transcriptions={data.transcriptions.filter(
             (t) => t.book_id === book.book_id
           )}
-          onBack={() => setView({ name: 'books' })}
-          onHome={() => {
-            setTab('shelf');
-            setView({ name: 'books' });
-          }}
-          onScan={() => setView({ name: 'scan', bookId: book.book_id })}
+          onBack={goBack}
+          onHome={goHome}
+          onScan={() => navigate({ name: 'scan', bookId: book.book_id })}
           onEdit={(t) =>
-            setView({ name: 'scan', bookId: book.book_id, editing: t })
+            navigate({ name: 'scan', bookId: book.book_id, editing: t })
           }
           onDeleteTranscription={deleteTranscription}
           onToggleFavorite={toggleFavorite}
@@ -346,7 +404,7 @@ export default function App() {
           onUpdateInfo={(info) => updateBookInfo(book.book_id, info)}
           onDeleteBook={() => {
             deleteBook(book.book_id);
-            setView({ name: 'books' });
+            goBack();
           }}
         />
       )}
@@ -355,14 +413,14 @@ export default function App() {
         <ScanEditor
           book={book}
           editing={view.editing}
-          onCancel={() => setView({ name: 'book', bookId: book.book_id })}
-          onHome={() => {
-            setTab('shelf');
-            setView({ name: 'books' });
-          }}
+          leaveGuardRef={leaveGuardRef}
+          onCancel={goBack}
+          onHome={goHome}
           onSave={(t) => {
             saveTranscription(t);
-            setView({ name: 'book', bookId: book.book_id });
+            // 저장한 뒤에는 쓰던 내용이 없으므로 확인 없이 책 상세로 돌아갑니다.
+            leaveGuardRef.current = null;
+            goBack();
           }}
         />
       )}

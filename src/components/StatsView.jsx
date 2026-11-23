@@ -116,7 +116,8 @@ function DayStats({ books, transcriptions }) {
   const moveWeek = (delta) => {
     const d = new Date(selected);
     d.setDate(d.getDate() + delta * 7);
-    setSelected(d);
+    // 일주일 뒤가 오늘보다 늦으면(미래) 오늘로 맞춥니다.
+    setSelected(keyOf(d) > todayKey ? new Date() : d);
   };
   // 달을 고르면 그 달 1일이 있는 주로 이동합니다. (이번 달이면 오늘)
   const pickMonth = (y, m) => {
@@ -343,6 +344,8 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
   const now = new Date();
   const thisYear = now.getFullYear();
   const maxYear = thisYear; // 미래 연도로는 이동하지 않습니다
+  // 올해에서 아직 오지 않은 달은 월간 통계로 열 수 없습니다.
+  const isFutureMonth = (i) => year > thisYear || (year === thisYear && i > now.getMonth());
   const [year, setYear] = useState(thisYear);
   const [picking, setPicking] = useState(false); // 연도 고르기 창이 열려 있는지
 
@@ -421,9 +424,10 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
           <button
             key={i}
             onClick={() => onOpenMonth(year, i)}
+            disabled={isFutureMonth(i)}
             aria-label={`${year}년 ${i + 1}월 월간 통계 보기, 필사 ${m.count}개`}
             title={`${i + 1}월 ${m.count}개`}
-            className="flex h-full flex-1 flex-col justify-end"
+            className="flex h-full flex-1 flex-col justify-end disabled:cursor-default"
           >
             <div
               className={`w-full rounded-t ${i + 1 === topMonth ? 'bg-accent' : 'bg-stone-300'}`}
@@ -437,8 +441,9 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
           <button
             key={i}
             onClick={() => onOpenMonth(year, i)}
+            disabled={isFutureMonth(i)}
             aria-label={`${year}년 ${i + 1}월 월간 통계 보기`}
-            className="flex-1 py-1"
+            className="flex-1 py-1 disabled:opacity-40"
           >
             {i + 1}
           </button>

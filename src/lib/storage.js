@@ -10,9 +10,21 @@ export function uid() {
   return 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 }
 
-export function loadData() {
+// 저장된 값이 깨져 읽지 못하면 원본을 이 키에 따로 보관합니다(빈 데이터로 덮어써도 복구할 수 있게).
+const CORRUPT_KEY = 'reading-notes:v1:corrupt';
+
+export function hasCorruptCopy() {
   try {
-    const raw = localStorage.getItem(KEY);
+    return localStorage.getItem(CORRUPT_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+export function loadData() {
+  let raw = null;
+  try {
+    raw = localStorage.getItem(KEY);
     if (!raw) return { books: [], transcriptions: [] };
     const parsed = JSON.parse(raw);
     return {
@@ -22,6 +34,12 @@ export function loadData() {
         : [],
     };
   } catch {
+    // 이미 보관한 원본이 있으면 그것을 지키고, 없을 때만 새로 보관합니다.
+    try {
+      if (raw && localStorage.getItem(CORRUPT_KEY) === null) localStorage.setItem(CORRUPT_KEY, raw);
+    } catch {
+      /* 보관 실패는 무시 */
+    }
     return { books: [], transcriptions: [] };
   }
 }

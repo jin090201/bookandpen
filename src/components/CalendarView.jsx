@@ -225,6 +225,12 @@ export default function CalendarView({ books, transcriptions }) {
   const monthKey = (d) => `${cursor.y}-${pad(cursor.m + 1)}-${pad(d)}`;
   const monthLabel = `${cursor.y}년 ${cursor.m + 1}월`;
 
+  // 미래 달로는 이동하지 않습니다(통계 화면과 같은 기준).
+  const nowDate = new Date();
+  const isThisMonth =
+    cursor.y > nowDate.getFullYear() ||
+    (cursor.y === nowDate.getFullYear() && cursor.m >= nowDate.getMonth());
+
   const moveMonth = (delta) => {
     const d = new Date(cursor.y, cursor.m + delta, 1);
     setCursor({ y: d.getFullYear(), m: d.getMonth() });
@@ -340,7 +346,14 @@ export default function CalendarView({ books, transcriptions }) {
         >
           {monthLabel} <span className="text-xs text-stone-400">{picking ? '▴' : '▾'}</span>
         </button>
-        <button onClick={() => moveMonth(1)} aria-label="다음 달" className="px-3 py-1 text-lg text-stone-600">›</button>
+        <button
+          onClick={() => moveMonth(1)}
+          disabled={isThisMonth}
+          aria-label="다음 달"
+          className="px-3 py-1 text-lg text-stone-600 disabled:opacity-30"
+        >
+          ›
+        </button>
       </div>
       {picking && (
         <MonthPicker
@@ -350,6 +363,7 @@ export default function CalendarView({ books, transcriptions }) {
           marked={markedMonths}
           onPick={pickMonth}
           onClose={() => setPicking(false)}
+          noFuture
         />
       )}
       <p className="text-center text-xs text-stone-500">
