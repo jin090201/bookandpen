@@ -1557,21 +1557,14 @@ export function SettingsView({ data, onImport, onClearAll }) {
           <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
             저작권 안내
           </summary>
-          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-            <RichText text={'책에서 옮겨 적은 글의 저작권은 해당 책의 **저자와 출판사**에 있어요.\n필사 기록은 **개인 감상용**으로 써 주세요.'} />
-          </p>
+          <GuideLines text={'책에서 옮겨 적은 글의 저작권은 해당 책의 **저자와 출판사**에 있어요.\n필사 기록은 **개인 감상용**으로 써 주세요.'} always />
           <Note kind="warn" text="블로그·SNS 등에 공개하거나 공유할 때는 출처를 밝히고 분량에 유의해 주세요." />
         </details>
         <details className="border-t border-stone-200 py-2">
           <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
             오픈소스 라이선스
           </summary>
-          <ul className="mt-1.5 space-y-1 text-sm text-stone-600">
-            <li>React · MIT 라이선스</li>
-            <li>Vite · MIT 라이선스</li>
-            <li>Tailwind CSS · MIT 라이선스</li>
-            <li>Tesseract.js · Apache License 2.0</li>
-          </ul>
+          <GuideLines text={'React · MIT 라이선스\nVite · MIT 라이선스\nTailwind CSS · MIT 라이선스\nTesseract.js · Apache License 2.0'} always />
         </details>
       </Section>
 
