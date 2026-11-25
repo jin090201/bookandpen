@@ -147,7 +147,8 @@ function DayStats({ books, transcriptions, selected, setSelected }) {
     <div className="mt-4">
       <KindChips kind={kind} setKind={setKind} />
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 rounded-xl border border-stone-200 bg-white p-3">
+      <div className="flex items-center justify-between">
         <button onClick={() => moveWeek(-1)} aria-label="이전 주" className="px-3 py-1 text-lg text-stone-600">‹</button>
         <button
           onClick={() => setPicking((v) => !v)}
@@ -197,6 +198,7 @@ function DayStats({ books, transcriptions, selected, setSelected }) {
             </button>
           );
         })}
+      </div>
       </div>
 
       <div className="mt-4 grid grid-cols-2 gap-2">
@@ -295,11 +297,12 @@ function MonthStats({ books, transcriptions, cur, setCur, onOpenDay }) {
         <Card
           label="가장 많이 필사한 날"
           value={topDay ? `${cur.m + 1}월 ${topDay}일` : '-'}
-          sub={topDay ? `필사 ${max}개` : '아직 기록이 없어요'}
+          sub={topDay ? `필사 ${max}개` : '아직 기록이 없어요.'}
         />
       </div>
 
-      <div className="mt-5 flex h-28 items-end gap-px border-b border-stone-200">
+      <div className="mt-4 rounded-xl border border-stone-200 bg-white p-3">
+      <div className="flex h-28 items-end gap-px border-b border-stone-200">
         {days.map((n, i) => (
           <button
             key={i}
@@ -323,7 +326,8 @@ function MonthStats({ books, transcriptions, cur, setCur, onOpenDay }) {
           </span>
         ))}
       </div>
-      <p className="mt-2 text-center text-xs text-stone-400">날짜별 필사 개수 · 막대를 누르면 일간 통계로 가요</p>
+      <p className="mt-2 text-center text-xs text-stone-400">날짜별 필사 개수 · 막대를 누르면 일간 통계로 가요.</p>
+      </div>
     </div>
   );
 }
@@ -453,10 +457,11 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
         <Card label="월 평균" value={`${avg}개`} sub={`완독 ${doneInYear}권`} />
       </div>
       <div className="mt-2">
-        <Card label="가장 많이 필사한 달" value={topMonth ? `${topMonth}월` : '-'} sub={topMonth ? `필사 ${max}개` : '아직 기록이 없어요'} />
+        <Card label="가장 많이 필사한 달" value={topMonth ? `${topMonth}월` : '-'} sub={topMonth ? `필사 ${max}개` : '아직 기록이 없어요.'} />
       </div>
 
-      <div className="mt-5 flex h-28 items-end gap-1.5 border-b border-stone-200">
+      <div className="mt-4 rounded-xl border border-stone-200 bg-white p-3">
+      <div className="flex h-28 items-end gap-1.5 border-b border-stone-200">
         {months.map((m, i) => (
           <button
             key={i}
@@ -486,7 +491,8 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
           </button>
         ))}
       </div>
-      <p className="mt-2 text-center text-xs text-stone-400">월별 필사 개수 · 달을 누르면 월간 통계로 가요</p>
+      <p className="mt-2 text-center text-xs text-stone-400">월별 필사 개수 · 달을 누르면 월간 통계로 가요.</p>
+      </div>
     </div>
   );
 }

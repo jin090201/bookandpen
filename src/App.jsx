@@ -467,7 +467,9 @@ export default function App() {
                 tab === key ? 'font-semibold text-accent' : 'text-stone-400'
               }`}
             >
-              <span className="text-lg leading-none">{icon}</span>
+              <span className={`text-lg leading-none ${tab === key ? '' : 'opacity-40'}`}>
+                {icon}
+              </span>
               {label}
             </button>
           ))}

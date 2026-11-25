@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { kindText, pageText } from '../lib/storage.js';
 import { dayKey, pad } from '../lib/date.js';
+import EmptyState from './EmptyState.jsx';
 import Pager, { usePaging } from './Pager.jsx';
 
 // ───────────────── 공통 도우미 (통계 화면에서도 씁니다) ─────────────────
@@ -56,7 +57,7 @@ export function DayList({ items, titleOf }) {
       return next;
     });
   if (items.length === 0) {
-    return <p className="py-6 text-center text-sm text-stone-400">이 날은 필사한 글이 없어요.</p>;
+    return <EmptyState title="이 날은 필사한 글이 없어요." className="mt-4" />;
   }
   return (
     <>
@@ -285,7 +286,8 @@ export default function CalendarView({ books, transcriptions }) {
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="mt-4 rounded-xl border border-stone-200 bg-white p-3">
+      <div className="flex items-center justify-between">
         <button onClick={() => moveMonth(-1)} aria-label="이전 달" className="px-3 py-1 text-lg text-stone-600">‹</button>
         <button
           onClick={() => setPicking((v) => !v)}
@@ -359,6 +361,7 @@ export default function CalendarView({ books, transcriptions }) {
       {monthDone > 0 && (
         <p className="mt-2 text-center text-xs text-stone-500">✓ 표시는 책을 완독한 날이에요.</p>
       )}
+      </div>
 
       <div className="mt-5">
         {selected ? (

@@ -1,5 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import Chip from './Chip.jsx';
+import EmptyState from './EmptyState.jsx';
 import Pager, { usePaging } from './Pager.jsx';
 import { KIND_LABEL, filterByKind, kindText, pageText } from '../lib/storage.js';
 
@@ -8,7 +9,7 @@ const SNIPPET_BEFORE = 30; // 찾은 글자 앞에 보여 줄 글자 수
 const SNIPPET_LENGTH = 130; // 본문 한 건에서 보여 줄 최대 글자 수
 
 // 검색어로 정규식을 만듭니다. 띄어쓰기와 대소문자는 구분하지 않습니다.
-function buildPattern(query) {
+export function buildPattern(query) {
   const chars = [...(query || '').replace(/\s+/g, '')];
   if (chars.length === 0) return null;
   const escaped = chars.map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
@@ -30,7 +31,7 @@ export function findTranscriptions(transcriptions, query) {
 }
 
 // 찾은 글자를 강조해서 보여 줍니다.
-function Highlight({ text, pattern }) {
+export function Highlight({ text, pattern }) {
   const parts = [];
   let last = 0;
   pattern.lastIndex = 0;
@@ -128,7 +129,7 @@ export default function SearchView({
           )}
         </div>
         {found.length === 0 ? (
-          <p className="mt-3 text-center text-sm text-stone-400">찾는 필사가 없어요.</p>
+          <EmptyState title="찾는 필사가 없어요." className="mt-4" />
         ) : (
           list
         )}
@@ -147,11 +148,13 @@ export default function SearchView({
           )
         )}
       </div>
-      <p className="mt-3 text-sm text-stone-500">{shown.length}개 찾았어요.</p>
+      {shown.length > 0 && <p className="mt-3 text-sm text-stone-500">{shown.length}개 찾았어요.</p>}
       {shown.length === 0 ? (
-        <p className="mt-8 text-center text-sm text-stone-400">
-          찾는 필사가 없어요. 다른 글자로 찾아 보세요.
-        </p>
+        <EmptyState
+          title="찾는 필사가 없어요."
+          hint="다른 글자로 찾아 보세요."
+          className="mt-8"
+        />
       ) : (
         list
       )}

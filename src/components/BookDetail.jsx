@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { STATUS_LABEL } from './BookList.jsx';
 import Chip from './Chip.jsx';
+import EmptyState from './EmptyState.jsx';
 import Pager, { usePaging } from './Pager.jsx';
 import { dotDate, fileStamp } from '../lib/date.js';
 import {
@@ -151,7 +152,7 @@ export default function BookDetail({
 
   // 읽기 기간 한 줄: 첫 필사 날짜부터 시작으로 보고, 완독이면 완독일을 보여 줍니다.
   const periodText = (() => {
-    if (sorted.length === 0) return '아직 필사가 없어요';
+    if (sorted.length === 0) return '아직 필사가 없어요.';
     const first = sorted[sorted.length - 1].created_at;
     const parts = [`${dotDate(first)} 시작`];
     if (book.status === 'COMPLETED' && book.completed_at) {
@@ -409,13 +410,9 @@ export default function BookDetail({
       )}
 
       {sorted.length === 0 ? (
-        <p className="mt-6 text-center text-sm text-stone-400">
-          아직 필사한 글이 없어요. 아래 버튼으로 책 페이지를 찍어 보세요.
-        </p>
+        <EmptyState title="아래 버튼으로 책 페이지를 찍어 보세요." className="mt-6" />
       ) : shown.length === 0 ? (
-        <p className="mt-6 text-center text-sm text-stone-400">
-          이 종류의 필사가 아직 없어요.
-        </p>
+        <EmptyState title="이 종류의 필사가 없어요." className="mt-6" />
       ) : (
         <ul className="mt-3 space-y-3">
           {pageItems.map((t) => (

@@ -472,7 +472,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
         )}
         <p className={`mt-1 text-right text-xs ${overContent ? 'text-red-600' : 'text-stone-500'}`}>
           {num(contentLen)} / {num(LIMITS.content)}자
-          {overContent && ` · ${num(contentLen - LIMITS.content)}자를 줄여 주세요`}
+          {overContent && ` · ${num(contentLen - LIMITS.content)}자를 줄여 주세요.`}
         </p>
       </div>
 
@@ -486,7 +486,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
         />
         <p className={`mt-1 text-right text-xs ${overMemo ? 'text-red-600' : 'text-stone-500'}`}>
           {num(memoLen)} / {num(LIMITS.memo)}자
-          {overMemo && ` · ${num(memoLen - LIMITS.memo)}자를 줄여 주세요`}
+          {overMemo && ` · ${num(memoLen - LIMITS.memo)}자를 줄여 주세요.`}
         </p>
       </div>
 

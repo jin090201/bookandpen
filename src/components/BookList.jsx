@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react';
 import Chip from './Chip.jsx';
+import EmptyState from './EmptyState.jsx';
 import Note, { DOUBT_WARNING, RichText } from './Note.jsx';
 import Pager, { usePaging } from './Pager.jsx';
-import SearchView, { findTranscriptions } from './SearchView.jsx';
+import SearchView, { Highlight, buildPattern, findTranscriptions } from './SearchView.jsx';
 import { MonthPicker, loadCalSettings, saveCalSettings } from './CalendarView.jsx';
 import { buildReadingDocument } from '../lib/calendarExport.js';
 import { dayKey, dotDate, fileStamp } from '../lib/date.js';
@@ -201,6 +202,20 @@ export default function BookList({
       : 0;
   }, [books, query]);
 
+  // 책이 검색에 걸린 이유: 제목에는 없고 저자(또는 출판사)에만 있을 때 그 줄을 카드에 보여 줍니다.
+  const searchPattern = useMemo(() => buildPattern(query), [query]);
+  const matchReason = (b) => {
+    if (!searchPattern) return null;
+    const hit = (s) => {
+      searchPattern.lastIndex = 0;
+      return searchPattern.test(s || '');
+    };
+    if (hit(b.title)) return null;
+    if (hit(b.author)) return { label: '저자', text: b.author };
+    if (hit(b.publisher)) return { label: '출판사', text: b.publisher };
+    return null;
+  };
+
   // 최근 검색어는 엔터를 누르거나 결과를 눌러 이동할 때만 저장합니다(입력 도중에는 저장하지 않음).
   const rememberSearch = () => {
     if (hasQuery) setRecent(addRecentSearch(query));
@@ -336,7 +351,7 @@ export default function BookList({
               onChange={(e) => changeQuery(e.target.value)}
               onFocus={() => setSearchFocused(true)}
               onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-              placeholder="책이나 필사에서 찾기"
+              placeholder="제목·저자·출판사·필사 내용에서 찾기"
               aria-label="책과 필사 검색"
               className="w-full rounded-xl border border-stone-300 bg-white py-2 pl-3 pr-10 text-base outline-none focus:border-stone-500"
             />
@@ -398,7 +413,7 @@ export default function BookList({
         <div className="mt-3 flex gap-1.5">
           {[
             ['all', '전체'],
-            ['book', `책 ${bookMatchCount}`],
+            ['book', `책(제목·저자·출판사) ${bookMatchCount}`],
             ['tx', `필사 ${found.length}`],
           ].map(([v, label]) => (
             <Chip key={v} active={scope === v} onClick={() => setScope(v)}>
@@ -492,9 +507,10 @@ export default function BookList({
           </button>
         </div>
       ) : visible.length === 0 ? (
-        <p className="mt-10 text-center text-sm text-stone-400">
-          {query.trim() ? '찾는 책이 없어요. 다른 글자로 찾아 보세요.' : '이 상태의 책이 없어요.'}
-        </p>
+        <EmptyState
+          title={query.trim() ? '찾는 책이 없어요.' : '이 상태의 책이 없어요.'}
+          hint={query.trim() ? '다른 글자로 찾아 보세요.' : '다른 상태를 눌러 보세요.'}
+        />
       ) : settings.view === 'list' ? (
         <ul className="mt-4 space-y-2">
           {visible.map((b) => {
@@ -546,8 +562,21 @@ export default function BookList({
                         b.author ? 'text-stone-500' : 'text-stone-400'
                       }`}
                     >
-                      {b.author || '저자 미입력'}
+                      {b.author ? (
+                        searchPattern ? (
+                          <Highlight text={b.author} pattern={searchPattern} />
+                        ) : (
+                          b.author
+                        )
+                      ) : (
+                        '저자 미입력'
+                      )}
                     </p>
+                    {matchReason(b)?.label === '출판사' && (
+                      <p className="mt-0.5 truncate text-xs text-stone-500">
+                        출판사: <Highlight text={b.publisher} pattern={searchPattern} />
+                      </p>
+                    )}
                     <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-stone-500">
                       {settings.showBadge && (
                         <span className={`rounded px-1.5 py-0.5 ${STATUS_STYLE[b.status]}`}>
@@ -639,6 +668,12 @@ export default function BookList({
                     필사 {s?.count || 0}개
                     {s?.last ? ` · ${daysAgo(s.last)}` : ''}
                   </p>
+                  {matchReason(b) && (
+                    <p className="mt-0.5 truncate text-xs text-stone-500">
+                      {matchReason(b).label}:{' '}
+                      <Highlight text={matchReason(b).text} pattern={searchPattern} />
+                    </p>
+                  )}
                 </button>
               </li>
             );
@@ -763,9 +798,9 @@ export function FavoritesView({
           </button>
           <button
             onClick={unfavoriteAll}
-            className="rounded-md border border-red-200 bg-white px-2 py-1 text-red-500"
+            className="rounded-md border border-stone-300 bg-white px-2 py-1 text-stone-700"
           >
-            전체 해제
+            전체 즐겨찾기 해제
           </button>
         </div>
       )}
@@ -774,14 +809,14 @@ export function FavoritesView({
         <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-stone-100 px-3 py-2 text-xs text-stone-600">
           <span className="font-semibold">{pickedIds.length}개 선택</span>
           <button onClick={togglePickAll} className="underline">
-            {allPicked ? '선택 해제' : '전체 선택'}
+            {allPicked ? '전체 선택 해제' : '전체 선택'}
           </button>
           <button
             onClick={unfavoriteSelected}
             disabled={pickedIds.length === 0}
-            className="ml-auto rounded-md border border-red-200 bg-white px-2 py-1 text-red-500 disabled:opacity-40"
+            className="ml-auto rounded-md border border-stone-300 bg-white px-2 py-1 text-stone-700 disabled:opacity-40"
           >
-            즐겨찾기 해제
+            선택한 {pickedIds.length}개 해제
           </button>
           <button onClick={exitSelecting} className="ml-1 text-stone-500">
             취소
@@ -790,9 +825,7 @@ export function FavoritesView({
       )}
 
       {favs.length === 0 ? (
-        <p className="mt-10 text-center text-sm text-stone-400">
-          아직 즐겨찾기한 문장이 없어요. 책의 필사 옆 ☆를 눌러 보세요.
-        </p>
+        <EmptyState title="책의 필사 옆 ☆를 눌러 보세요." className="mt-8" />
       ) : (
         <ul className="mt-4 space-y-3">
           {pageItems.map((t) => {
@@ -927,9 +960,9 @@ function Hint({ children }) {
 
 // 화면 구성 편집 미리보기: 옵션을 바꾸면 바로 달라져요 (현재 색 테마·포인트 색 그대로 표시)
 const PREVIEW_BOOKS = [
-  { title: '파이썬', author: '홍길동', status: 'READING', fresh: true },
+  { title: '노인과 바다', author: '어니스트 헤밍웨이', status: 'READING', fresh: true },
   { title: '어린 왕자', author: '생텍쥐페리', status: 'COMPLETED', fresh: false },
-  { title: '데미안', author: '헤르만 헤세', status: 'READING', fresh: false },
+  { title: '데미안', author: '헤르만 헤세', status: 'WISH', fresh: false },
 ];
 
 function ScreenPreview({ settings }) {
@@ -975,10 +1008,16 @@ function ScreenPreview({ settings }) {
           </li>
         ))}
       </ul>
-      <div className="flex justify-around border-t border-stone-200 py-1.5 text-xs">
-        <span className="font-semibold text-accent">책장</span>
-        <span className="text-stone-400">즐겨찾기</span>
-        <span className="text-stone-400">설정</span>
+      <div className="grid grid-cols-4 border-t border-stone-200 py-1.5 text-xs">
+        {PREVIEW_TABS.map(([icon, label], i) => (
+          <span
+            key={label}
+            className={`flex flex-col items-center ${i === 0 ? 'font-semibold text-accent' : 'text-stone-400'}`}
+          >
+            <span className={`text-base leading-none ${i === 0 ? '' : 'opacity-40'}`}>{icon}</span>
+            {label}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -1000,6 +1039,14 @@ function ChoiceButton({ active, onClick, children, style, small }) {
   );
 }
 
+// 화면 구성 미리보기의 하단 탭입니다. App.jsx의 TABS와 같은 아이콘·순서로 맞춰 둡니다.
+const PREVIEW_TABS = [
+  ['📚', '책장'],
+  ['★', '즐겨찾기'],
+  ['📝', '기록'],
+  ['⚙', '설정'],
+];
+
 // 접고 펼 수 있는 설정 카드. 접힌 상태에서는 제목 옆에 현재 선택을 작게 보여 줍니다.
 function Section({ title, summary, open, onToggle, children }) {
   return (
@@ -1016,7 +1063,7 @@ function Section({ title, summary, open, onToggle, children }) {
           )}
         </span>
         <span
-          className={`text-xs text-stone-500 transition-transform ${
+          className={`text-xs text-stone-400 transition-transform ${
             open ? 'rotate-180' : ''
           }`}
         >
@@ -1183,7 +1230,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
   return (
     <div className="px-4 pt-6">
       <h1 className="font-body text-2xl font-bold">설정</h1>
-      <p className="mt-1 text-xs text-stone-500">항목 이름을 누르면 펼치고 접을 수 있어요</p>
+      <p className="mt-1 text-xs text-stone-500">항목 이름을 누르면 펼치고 접을 수 있어요.</p>
 
       <Section
         title="글자 설정"
