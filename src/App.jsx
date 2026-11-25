@@ -13,6 +13,7 @@ import {
   storageUsage,
   uid,
 } from './lib/storage.js';
+import { dayKey } from './lib/date.js';
 import BookList, { FavoritesView, SettingsView } from './components/BookList.jsx';
 import BookDetail from './components/BookDetail.jsx';
 import ScanEditor from './components/ScanEditor.jsx';
@@ -95,6 +96,24 @@ export default function App() {
     setSaveError(!saveData(data));
     setUsage(storageUsage());
   }, [data]);
+
+  // 앱을 열어 둔 채 자정을 넘기면 "오늘"·"올해" 기준이 바뀝니다. 화면에 다시 돌아오거나 1분마다 날짜를 확인해,
+  // 날짜가 바뀌었으면 기록 탭(달력·통계)을 오늘 기준으로 새로 엽니다(필사 입력 화면은 건드리지 않습니다).
+  const [dayStamp, setDayStamp] = useState(() => dayKey(new Date()));
+  useEffect(() => {
+    const check = () => setDayStamp(dayKey(new Date())); // 같은 값이면 다시 그리지 않습니다
+    const onVisible = () => {
+      if (!document.hidden) check();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', check);
+    const timer = setInterval(check, 60000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', check);
+      clearInterval(timer);
+    };
+  }, []);
 
   // 다른 탭에서 기록이 바뀌면 이 탭도 최신 기록을 읽어 옵니다(그대로 두면 나중에 저장한 탭이 앞의 변경을 덮어씁니다).
   // 값이 같으면 브라우저가 이벤트를 보내지 않으므로, 읽어 와서 다시 저장해도 서로 계속 주고받지 않습니다.
@@ -380,11 +399,13 @@ export default function App() {
               </button>
             ))}
           </div>
-          {recordTab === 'calendar' ? (
-            <CalendarView books={data.books} transcriptions={data.transcriptions} />
-          ) : (
-            <StatsView books={data.books} transcriptions={data.transcriptions} />
-          )}
+          {/* 달력과 통계를 둘 다 띄워 두고 안 보이는 쪽은 숨깁니다. 그래야 오가도 보던 달·날짜·탭이 유지됩니다. */}
+          <div className={recordTab === 'calendar' ? '' : 'hidden'}>
+            <CalendarView key={dayStamp} books={data.books} transcriptions={data.transcriptions} />
+          </div>
+          <div className={recordTab === 'stats' ? '' : 'hidden'}>
+            <StatsView key={dayStamp} books={data.books} transcriptions={data.transcriptions} />
+          </div>
         </>
       )}
 

@@ -49,6 +49,13 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('');
   const [error, setError] = useState('');
+  // 오류 문장 아래에 보여 줄 버튼: 'type'(직접 입력하기) · 'both'(다시 고르기 + 직접 입력하기) · ''(없음)
+  const [errorBtns, setErrorBtns] = useState('');
+  const lastFileRef = useRef(null); // 마지막으로 고른 사진("다시 고르기"에서 자르기 화면을 다시 엽니다)
+  const fail = (text, btns = '') => {
+    setError(text);
+    setErrorBtns(btns);
+  };
 
   const [rawText, setRawText] = useState('');
   const [content, setContent] = useState(editing?.content ?? '');
@@ -109,10 +116,11 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
     e.target.value = ''; // 같은 파일 재선택 허용
     if (!file) return;
     if (file.size > LIMITS.photoMB * 1024 * 1024) {
-      setError(`사진이 너무 커요. ${LIMITS.photoMB}MB 이하 사진을 골라 주세요.`);
+      fail(`사진이 너무 커요. ${LIMITS.photoMB}MB 이하 사진을 골라 주세요.`, 'type');
       return;
     }
-    setError('');
+    fail('');
+    lastFileRef.current = file;
     setPendingFile(file);
   };
 
@@ -127,7 +135,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
       if (!window.confirm('필사 내용이 새 사진의 글자로 바뀌어요. 계속할까요?')) return;
     }
 
-    setError('');
+    fail('');
     setBusy(true);
     setProgress(0);
     setStatusText('준비 중…');
@@ -151,7 +159,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
       const cleaned = postprocess(text);
       if (!cleaned) {
         // 인식된 글자가 없으면 기존 내용을 건드리지 않습니다.
-        setError('글자를 찾지 못했어요. 고른 부분에 글자가 있는지 확인하거나, 더 밝고 선명하게 다시 찍어 보세요.');
+        fail('글자를 찾지 못했어요.\n고른 부분이 너무 작지 않은지 확인하거나, 더 밝고 선명하게 다시 찍어 보세요.', 'both');
         return;
       }
       // 이어 붙이기를 골랐고 기존에 적던 내용이 있으면 아래에 붙이고, 그 밖에는 새 글자로 채웁니다.
@@ -168,10 +176,11 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
       setContent((prev) => (appended && prev.trim() ? prev.trim() + '\n\n' + cleaned : cleaned));
     } catch (err) {
       console.error(err);
-      setError(
+      fail(
         err?.code === 'IMAGE'
-          ? '이 사진을 열 수 없어요. JPG나 PNG 사진으로 다시 골라 주세요.'
-          : '인식에 실패했어요. 인터넷 연결(최초 언어 데이터 다운로드)을 확인하고 다시 시도해 주세요.'
+          ? '이 사진을 열 수 없어요.\nJPG나 PNG 사진으로 다시 골라 주세요.'
+          : '인식에 실패했어요.\n인터넷 연결(처음 한 번 언어 데이터 내려받기)을 확인하고 다시 시도해 주세요.\n인터넷이 안 될 때는 직접 입력해서 적을 수 있어요.',
+        err?.code === 'IMAGE' ? 'type' : 'both'
       );
     } finally {
       setBusy(false);
@@ -335,7 +344,36 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
         </div>
       )}
 
-      {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      {error && (
+        <div className="mt-3">
+          <p className="whitespace-pre-line text-sm text-red-600">{error}</p>
+          {errorBtns && (
+            <div className="mt-2 flex gap-2">
+              {errorBtns === 'both' && lastFileRef.current && (
+                <button
+                  onClick={() => {
+                    fail('');
+                    setPendingFile(lastFileRef.current);
+                  }}
+                  className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-sm font-medium"
+                >
+                  다시 고르기
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  fail('');
+                  textareaRef.current?.focus();
+                  textareaRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }}
+                className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-on-accent"
+              >
+                직접 입력하기
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-5 flex items-center gap-2">
         {Object.entries(KIND_LABEL).map(([key, label]) => (

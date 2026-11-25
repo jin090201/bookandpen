@@ -38,6 +38,8 @@ export default function StatsView({ books, transcriptions }) {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() };
   });
+  // 일간 통계가 보여 줄 날 (월간 통계에서 날짜 막대를 누르면 이 값이 바뀌고 일간으로 넘어옵니다)
+  const [daySel, setDaySel] = useState(() => new Date());
   const total = transcriptions.length;
   // 목표·월간·연간 통계와 같은 기준입니다: 완독 날짜(completed_at)가 있는 완독 책만 셉니다.
   const completed = books.filter((b) => b.status === 'COMPLETED' && b.completed_at).length;
@@ -66,9 +68,20 @@ export default function StatsView({ books, transcriptions }) {
         ))}
       </div>
 
-      {tab === 'day' && <DayStats books={books} transcriptions={transcriptions} />}
+      {tab === 'day' && (
+        <DayStats books={books} transcriptions={transcriptions} selected={daySel} setSelected={setDaySel} />
+      )}
       {tab === 'month' && (
-        <MonthStats books={books} transcriptions={transcriptions} cur={monthCur} setCur={setMonthCur} />
+        <MonthStats
+          books={books}
+          transcriptions={transcriptions}
+          cur={monthCur}
+          setCur={setMonthCur}
+          onOpenDay={(y, m, d) => {
+            setDaySel(new Date(y, m, d));
+            setTab('day');
+          }}
+        />
       )}
       {tab === 'year' && (
         <YearStats
@@ -85,10 +98,9 @@ export default function StatsView({ books, transcriptions }) {
 }
 
 // ───────────────── 일간 통계 ─────────────────
-function DayStats({ books, transcriptions }) {
+function DayStats({ books, transcriptions, selected, setSelected }) {
   const { weekStart } = loadCalSettings();
   const [kind, setKind] = useState('all'); // all | quote | mine | none
-  const [selected, setSelected] = useState(() => new Date());
   const [picking, setPicking] = useState(false); // 연·월 고르기 창이 열려 있는지
   const names = weekdayNames(weekStart);
 
@@ -114,6 +126,10 @@ function DayStats({ books, transcriptions }) {
   const todayKey = keyOf(new Date());
   const weekHasToday = week.some((d) => keyOf(d) >= todayKey);
   const items = byDay[selKey] || [];
+  // 그날 완독한 책 (달력과 같은 기준: 완독 날짜가 있는 완독 책)
+  const doneTitles = books
+    .filter((b) => b.status === 'COMPLETED' && b.completed_at && dayKey(b.completed_at) === selKey)
+    .map((b) => b.title);
   const moveWeek = (delta) => {
     const d = new Date(selected);
     d.setDate(d.getDate() + delta * 7);
@@ -187,6 +203,11 @@ function DayStats({ books, transcriptions }) {
         <Card label="필사 수" value={`${num(items.length)}개`} />
         <Card label="글자 수" value={`${num(chars(items))}자`} />
       </div>
+      {doneTitles.length > 0 && (
+        <div className="mt-2">
+          <Card label="✓ 완독한 책" value={doneTitles.join(', ')} />
+        </div>
+      )}
 
       <div className="mt-4">
         <DayList key={selKey} items={items} titleOf={titleOf} />
@@ -196,7 +217,7 @@ function DayStats({ books, transcriptions }) {
 }
 
 // ───────────────── 월간 통계 ─────────────────
-function MonthStats({ books, transcriptions, cur, setCur }) {
+function MonthStats({ books, transcriptions, cur, setCur, onOpenDay }) {
   const [kind, setKind] = useState('all'); // all | quote | mine | none
   const [picking, setPicking] = useState(false); // 연·월 고르기 창이 열려 있는지
 
@@ -280,12 +301,19 @@ function MonthStats({ books, transcriptions, cur, setCur }) {
 
       <div className="mt-5 flex h-28 items-end gap-px border-b border-stone-200">
         {days.map((n, i) => (
-          <div key={i} className="flex h-full flex-1 flex-col justify-end" title={`${cur.m + 1}월 ${i + 1}일 ${n}개`}>
+          <button
+            key={i}
+            onClick={() => onOpenDay(cur.y, cur.m, i + 1)}
+            disabled={dayKey(new Date(cur.y, cur.m, i + 1)) > dayKey(new Date())}
+            aria-label={`${cur.m + 1}월 ${i + 1}일 필사 ${n}개, 일간 통계 보기`}
+            className="flex h-full flex-1 flex-col justify-end disabled:cursor-default"
+            title={`${cur.m + 1}월 ${i + 1}일 ${n}개`}
+          >
             <div
               className={`w-full rounded-t ${i + 1 === topDay ? 'bg-accent' : 'bg-stone-300'}`}
               style={{ height: max > 0 ? `${(n / max) * 100}%` : '0%', minHeight: n > 0 ? 3 : 0 }}
             />
-          </div>
+          </button>
         ))}
       </div>
       <div className="mt-1 flex gap-px text-center text-[11px] text-stone-400">
@@ -295,7 +323,7 @@ function MonthStats({ books, transcriptions, cur, setCur }) {
           </span>
         ))}
       </div>
-      <p className="mt-2 text-center text-xs text-stone-400">날짜별 필사 개수</p>
+      <p className="mt-2 text-center text-xs text-stone-400">날짜별 필사 개수 · 막대를 누르면 일간 통계로 가요</p>
     </div>
   );
 }

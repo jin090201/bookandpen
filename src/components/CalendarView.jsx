@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
-import { downloadTextFile, kindText, pageText, safeFilename } from '../lib/storage.js';
-import { dayKey, dotDate, pad } from '../lib/date.js';
+import { kindText, pageText } from '../lib/storage.js';
+import { dayKey, pad } from '../lib/date.js';
 import Pager, { usePaging } from './Pager.jsx';
 
 // ───────────────── 공통 도우미 (통계 화면에서도 씁니다) ─────────────────
 const SETTINGS_KEY = 'reading-notes:calendar:v1';
-const DEFAULT_CAL = { weekStart: 0, mode: 'shade', range: 'month', format: 'md' };
+// format은 설정의 "읽기용 문서로 내려받기"가 쓰는 형식입니다(같은 키에 함께 보관).
+const DEFAULT_CAL = { weekStart: 0, mode: 'shade', format: 'md' };
 
 export function loadCalSettings() {
   try {
@@ -13,7 +14,6 @@ export function loadCalSettings() {
     return {
       weekStart: v.weekStart === 1 ? 1 : 0,
       mode: v.mode === 'dot' ? 'dot' : 'shade',
-      range: v.range === 'all' ? 'all' : 'month',
       format: v.format === 'txt' ? 'txt' : 'md',
     };
   } catch {
@@ -21,7 +21,7 @@ export function loadCalSettings() {
   }
 }
 
-function saveCalSettings(s) {
+export function saveCalSettings(s) {
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
   } catch {
@@ -159,45 +159,6 @@ export function MonthPicker({ year, month, marked, onPick, onClose, noFuture = f
   );
 }
 
-// ───────────────── 내려받기 파일 만들기 ─────────────────
-function buildCalendarFile({ days, byDay, titleOf, label, format }) {
-  const totalCount = days.reduce((n, k) => n + byDay[k].length, 0);
-  const stamp = dotDate(new Date());
-  const dayLabel = (k) => {
-    const [y, m, d] = k.split('-').map(Number);
-    return `${y}년 ${m}월 ${d}일`;
-  };
-  const lines = [];
-  if (format === 'md') {
-    lines.push(`# 독서 달력 · ${label}`, '');
-    lines.push(`필사한 날 ${days.length}일 · 필사 ${totalCount}개 · ${stamp} 내보냄`, '');
-    for (const k of days) {
-      lines.push(`## ${dayLabel(k)}`, '');
-      for (const t of byDay[k]) {
-        const head = [titleOf(t.book_id), kindText(t)];
-        if (t.page) head.push(pageText(t));
-        lines.push(`### ${head.join(' · ')}${t.favorite ? ' ★' : ''}`, '');
-        lines.push(...t.content.split('\n').map((l) => (l.trim() ? `> ${l}` : '>')), '');
-        if (t.memo) lines.push(`메모: ${t.memo}`, '');
-      }
-    }
-  } else {
-    lines.push(`독서 달력 · ${label}`, `필사한 날 ${days.length}일 · 필사 ${totalCount}개`, '');
-    for (const k of days) {
-      lines.push(`[${dayLabel(k)}]`, '');
-      for (const t of byDay[k]) {
-        lines.push(
-          `${titleOf(t.book_id)} · [${kindText(t)}]${t.page ? ` ${pageText(t)}` : ''}${t.favorite ? ' ★' : ''}`,
-          t.content
-        );
-        if (t.memo) lines.push(`메모: ${t.memo}`);
-        lines.push('', '----', '');
-      }
-    }
-  }
-  return lines.join('\n');
-}
-
 // ───────────────── 독서 달력 화면 ─────────────────
 export default function CalendarView({ books, transcriptions }) {
   const today = new Date();
@@ -205,7 +166,6 @@ export default function CalendarView({ books, transcriptions }) {
   const [selected, setSelected] = useState(dayKey(today.toISOString()));
   const [cal, setCal] = useState(loadCalSettings);
   const [draft, setDraft] = useState(null); // 설정 창이 열려 있으면 편집 중인 값
-  const [msg, setMsg] = useState('');
   const [picking, setPicking] = useState(false); // 연·월 고르기 창이 열려 있는지
 
   const byDay = useMemo(() => groupByDay(transcriptions), [transcriptions]);
@@ -213,6 +173,14 @@ export default function CalendarView({ books, transcriptions }) {
   const titleOf = useMemo(() => {
     const m = Object.fromEntries(books.map((b) => [b.book_id, b.title]));
     return (id) => m[id] || '(삭제된 책)';
+  }, [books]);
+  // 완독한 날: { 'YYYY-MM-DD': [책 제목…] } (완독 날짜가 있는 완독 책만, 통계와 같은 기준)
+  const doneByDay = useMemo(() => {
+    const m = {};
+    for (const b of books) {
+      if (b.status === 'COMPLETED' && b.completed_at) (m[dayKey(b.completed_at)] ||= []).push(b.title);
+    }
+    return m;
   }, [books]);
 
   const first = new Date(cursor.y, cursor.m, 1);
@@ -253,24 +221,9 @@ export default function CalendarView({ books, transcriptions }) {
 
   const monthDays = Object.keys(byDay).filter((k) => k.startsWith(`${cursor.y}-${pad(cursor.m + 1)}-`));
   const monthCount = monthDays.reduce((n, k) => n + byDay[k].length, 0);
-
-  const download = () => {
-    const days = (cal.range === 'all' ? Object.keys(byDay) : monthDays).sort();
-    if (days.length === 0) {
-      setMsg('내려받을 필사가 없어요.');
-      return;
-    }
-    const label = cal.range === 'all' ? '전체' : monthLabel;
-    const text = buildCalendarFile({ days, byDay, titleOf, label, format: cal.format });
-    const ext = cal.format === 'md' ? 'md' : 'txt';
-    const name = cal.range === 'all' ? '독서달력-전체' : `독서달력-${cursor.y}-${pad(cursor.m + 1)}`;
-    downloadTextFile(
-      `${safeFilename(name)}.${ext}`,
-      text,
-      cal.format === 'md' ? 'text/markdown' : 'text/plain'
-    );
-    setMsg('파일을 내려받았어요.');
-  };
+  const monthDone = Object.keys(doneByDay)
+    .filter((k) => k.startsWith(`${cursor.y}-${pad(cursor.m + 1)}-`))
+    .reduce((n, k) => n + doneByDay[k].length, 0);
 
   const saveDraft = () => {
     setCal(draft);
@@ -306,8 +259,6 @@ export default function CalendarView({ books, transcriptions }) {
         <h1 className="font-body text-2xl font-bold">독서 달력 설정</h1>
         <Choice label="한 주의 시작" value={draft.weekStart} field="weekStart" options={[[0, '일요일'], [1, '월요일']]} />
         <Choice label="날짜 표시" value={draft.mode} field="mode" options={[['shade', '진하기'], ['dot', '점']]} />
-        <Choice label="내려받기 범위" value={draft.range} field="range" options={[['month', '보는 달만'], ['all', '전체']]} />
-        <Choice label="내려받기 형식" value={draft.format} field="format" options={[['md', '마크다운'], ['txt', '텍스트']]} />
         <div className="mt-6 grid grid-cols-2 gap-2">
           <button onClick={() => setDraft(null)} className="rounded-xl border border-stone-300 py-3 text-sm font-medium">
             취소
@@ -330,11 +281,9 @@ export default function CalendarView({ books, transcriptions }) {
       <div className="flex items-center justify-between">
         <h1 className="font-body text-2xl font-bold">독서 달력</h1>
         <div className="flex items-center gap-3 text-sm text-stone-600">
-          <button onClick={() => { setMsg(''); setDraft(cal); }}>설정</button>
-          <button onClick={download}>내려받기</button>
+          <button onClick={() => setDraft(cal)}>설정</button>
         </div>
       </div>
-      {msg && <p className="mt-1 text-xs text-stone-500">{msg}</p>}
 
       <div className="mt-4 flex items-center justify-between">
         <button onClick={() => moveMonth(-1)} aria-label="이전 달" className="px-3 py-1 text-lg text-stone-600">‹</button>
@@ -368,6 +317,7 @@ export default function CalendarView({ books, transcriptions }) {
       )}
       <p className="text-center text-xs text-stone-500">
         이 달 필사한 날 {monthDays.length}일 · 필사 {monthCount}개
+        {monthDone > 0 ? ` · 완독 ${monthDone}권` : ''}
       </p>
 
       <div className="mt-3 grid grid-cols-7 gap-1 text-center text-xs text-stone-500">
@@ -380,12 +330,13 @@ export default function CalendarView({ books, transcriptions }) {
           if (d === null) return <div key={`b${i}`} />;
           const key = monthKey(d);
           const n = (byDay[key] || []).length;
+          const done = (doneByDay[key] || []).length;
           const isToday = key === dayKey(today.toISOString());
           return (
             <button
               key={key}
               onClick={() => setSelected(key)}
-              aria-label={`${cursor.m + 1}월 ${d}일 필사 ${n}개`}
+              aria-label={`${cursor.m + 1}월 ${d}일 필사 ${n}개${done > 0 ? `, 완독 ${done}권` : ''}`}
               className={`relative flex aspect-square items-center justify-center rounded-lg text-sm ${
                 cal.mode === 'shade' ? shadeClass(n) : 'text-stone-700'
               } ${selected === key ? 'ring-2 ring-accent' : isToday ? 'ring-1 ring-stone-400' : ''}`}
@@ -394,10 +345,20 @@ export default function CalendarView({ books, transcriptions }) {
               {cal.mode === 'dot' && n > 0 && (
                 <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-accent" />
               )}
+              {/* 완독한 날 표시: 칸의 글자색을 따라가므로 진한 칸에서도 읽힙니다. */}
+              {done > 0 && (
+                <span aria-hidden="true" className="absolute right-1 top-0.5 text-[10px] font-bold leading-none">
+                  ✓
+                </span>
+              )}
             </button>
           );
         })}
       </div>
+
+      {monthDone > 0 && (
+        <p className="mt-2 text-center text-xs text-stone-500">✓ 표시는 책을 완독한 날이에요.</p>
+      )}
 
       <div className="mt-5">
         {selected ? (
@@ -405,6 +366,9 @@ export default function CalendarView({ books, transcriptions }) {
             <p className="mb-2 text-sm font-semibold text-stone-700">
               {selectedLabel} · 필사 {selectedItems.length}개
             </p>
+            {(doneByDay[selected] || []).length > 0 && (
+              <p className="mb-2 text-sm text-stone-700">✓ 완독: {doneByDay[selected].join(', ')}</p>
+            )}
             <DayList key={selected} items={selectedItems} titleOf={titleOf} />
           </>
         ) : (

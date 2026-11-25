@@ -3,7 +3,9 @@ import Chip from './Chip.jsx';
 import Note, { DOUBT_WARNING, RichText } from './Note.jsx';
 import Pager, { usePaging } from './Pager.jsx';
 import SearchView, { findTranscriptions } from './SearchView.jsx';
-import { dotDate, fileStamp } from '../lib/date.js';
+import { MonthPicker, loadCalSettings, saveCalSettings } from './CalendarView.jsx';
+import { buildReadingDocument } from '../lib/calendarExport.js';
+import { dayKey, dotDate, fileStamp } from '../lib/date.js';
 import {
   ACCENT_OPTIONS,
   BODY_FONT_IDS,
@@ -867,7 +869,7 @@ const GUIDE = [
   {
     q: '2. 사진으로 필사하기',
     a: '책을 열고 **📷 필사 추가하기**를 눌러 사진을 넣으세요.\n필요한 부분만 네모로 골라 **이 부분으로 인식하기**를 누르면 글자가 인식돼요.\n틀린 글자를 고친 뒤 **저장하기**를 누르면 끝이에요.\n지난 필사는 **기록한 날**을 바꿔서 넣을 수 있어요.\n며칠에 걸쳐 썼다면 날마다 나눠서 저장해 주세요. 달력과 통계에 날마다 기록돼요.',
-    tip: '페이지 숫자와 머리글은 네모에서 빼 주세요. 인식이 안 맞으면 폰의 글자 복사 기능(구글 렌즈 등)으로 복사해 붙여 넣어도 돼요.',
+    tip: '페이지 숫자와 머리글은 네모에서 빼 주세요. 인식이 안 맞으면 폰의 글자 복사 기능(구글 렌즈 등)으로 복사해 붙여 넣어도 돼요.\n글자를 못 찾았다는 안내가 나오면 **다시 고르기**로 영역을 넓히거나, **직접 입력하기**로 바로 적을 수 있어요.',
   },
   {
     q: '3. 마음에 든 문장 모아 보기',
@@ -876,7 +878,7 @@ const GUIDE = [
   },
   {
     q: '4. 책 찾고 정리하기',
-    a: '책장 위의 칩으로 상태별(읽고 싶은, 읽는 중, 완독, 중단)로 거르고, 검색 칸에서 책 제목, 저자, 필사 내용과 메모를 함께 찾을 수 있어요.\n검색어 아래의 칩(**전체 · 책 · 필사**)으로 찾을 범위를 바꿔요. **필사**를 누르면 필사만 모아 볼 수 있고, 검색 칸을 누르면 최근 검색어가 보여요.\n정렬(최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순)은 칩 아래에서, 보기 방식(▦ 표지형 / ☰ 목록형)은 그 오른쪽에서 바꿔요.\n**편집**을 누르면 여러 권을 골라 삭제할 수 있고, **전체 선택**으로 한 번에 고를 수도 있어요.',
+    a: '> 책은 **칩·검색·정렬**로 찾고, **편집**으로 한꺼번에 정리해요.\n\n책장 위의 칩으로 상태별(읽고 싶은, 읽는 중, 완독, 중단)로 거르고, 검색 칸에서 책 제목, 저자, 필사 내용과 메모를 함께 찾을 수 있어요.\n검색어 아래의 칩(**전체 · 책 · 필사**)으로 찾을 범위를 바꿔요. **필사**를 누르면 필사만 모아 볼 수 있고, 검색 칸을 누르면 최근 검색어가 보여요.\n정렬(최근 필사순, 등록순, 제목순, 저자순, 필사 많은 순)은 칩 아래에서, 보기 방식(▦ 표지형 / ☰ 목록형)은 그 오른쪽에서 바꿔요.\n**편집**을 누르면 여러 권을 골라 삭제할 수 있고, **전체 선택**으로 한 번에 고를 수도 있어요.',
     tip: '검색에서는 띄어쓰기와 대소문자를 구분하지 않아요.',
   },
   {
@@ -886,7 +888,7 @@ const GUIDE = [
   },
   {
     q: '6. 백업하기',
-    a: '기록은 이 기기의 브라우저에만 저장돼요. 브라우저 데이터를 지우면 사라져요.\n설정의 **데이터**에서 **내보내기**로 백업 파일을 가끔 내려받아 두세요.\n다른 기기에서는 **가져오기**로 불러올 수 있어요. 자세한 내용은 11번을 보세요.',
+    a: '> 기록은 **백업 파일(.json)**로 보관하고, 문서(.md, .txt)는 읽는 용도예요.\n\n**백업하기**\n기록은 이 기기의 브라우저에만 저장돼요. 브라우저 데이터를 지우면 사라져요.\n설정의 **데이터**에서 **백업 내보내기**로 백업 파일을 가끔 내려받아 두세요.\n\n**다른 기기에서 불러오기**\n**가져오기**로 불러올 수 있어요. 자세한 내용은 11번을 보세요.\n\n**읽기용 문서로 내려받기**\n읽고 공유하는 용도라서, 이 파일로는 기록을 되살릴 수 없어요.\n월별이나 올해 기록을 문서로 보고 싶을 때 쓰세요.',
     tip: '글자 크기, 색 같은 화면 설정은 백업에 들어가지 않아서, 다른 기기에서는 설정에서 다시 골라 주세요.',
   },
   {
@@ -896,7 +898,7 @@ const GUIDE = [
   },
   {
     q: '8. 설정 항목 접고 펼치기',
-    a: '설정의 각 항목은 이름을 누르면 펼쳐지고, 다시 누르면 접혀요.',
+    a: '설정의 각 항목은 이름을 누르면 펼쳐지고, 다시 누르면 접혀요.\n설정 탭에 들어올 때마다 화면 구성 편집만 펼쳐진 상태로 시작해요.',
   },
   {
     q: '9. 잘못 읽은 글자 찾기',
@@ -909,12 +911,12 @@ const GUIDE = [
   },
   {
     q: '11. 가져오기와 백업 파일',
-    a: '**가져올 수 있는 파일**\n북앤펜에서 내보낸 백업 파일(.json)만 가져올 수 있어요.\n\n**가져올 수 없는 파일**\n필사를 내려받은 .md, .txt 파일과 다른 앱의 파일은 불러올 수 없어요.\n\n**가져오면 이렇게 돼요**\n이미 있는 기록은 건너뛰고, 없는 기록만 더해져요. 올해 완독 목표도 들어 있고, 이미 목표를 정한 해는 그대로 둬요. 화면 설정은 들어 있지 않아요.',
+    a: '> **북앤펜 백업 파일(.json)**만 가져올 수 있어요.\n\n**가져올 수 있는 파일**\n설정 → 데이터의 **백업 내보내기**로 받은 .json 파일\n\n**가져올 수 없는 파일**\n읽기용 문서(.md, .txt)와 다른 앱의 파일\n읽고 공유하는 용도라서 기록을 되살릴 수 없어요.\n\n**가져오면 이렇게 돼요**\n이미 있는 기록은 건너뛰고, 없는 기록만 더해져요.\n올해 완독 목표도 들어 있고, 이미 목표를 정한 해는 그대로 둬요.\n화면 설정은 들어 있지 않아요.',
     warn: '백업 파일을 직접 고치면 틀린 값은 고쳐서 받거나 그 기록만 건너뛸 수 있어요.',
   },
   {
     q: '12. 기록 탭에서 날짜별로 보기',
-    a: '**기록** 탭의 **달력**에서는 필사한 날이 진하게 보여요.\n날짜를 누르면 그날의 필사가 보여요.\n제목(**2026년 11월 ▾**)을 누르면 연도와 달을 골라 바로 이동할 수 있어요.\n**통계**는 일간·월간·연간으로 볼 수 있고, 제목을 눌러 연도와 달을 고를 수 있어요.\n연간에서 달을 누르면 그 달의 월간 통계가 보여요.\n통계 위쪽에서는 올해 읽을 책 수(**완독 목표**)를 정하고 진행을 볼 수 있어요.\n오늘 이후의 날짜와 달은 볼 수 없어요.',
+    a: '> **달력**으로 날짜별 기록을, **통계**로 일·월·연 단위 기록과 완독 목표를 봐요.\n\n**달력**\n**기록** 탭의 **달력**에서는 필사한 날이 진하게 보이고, 책을 완독한 날에는 ✓ 표시가 붙어요.\n날짜를 누르면 그날의 필사와 완독한 책이 보여요.\n제목(**2026년 11월 ▾**)을 누르면 연도와 달을 골라 바로 이동할 수 있어요.\n\n**통계**\n일간·월간·연간으로 볼 수 있고, 제목을 눌러 연도와 달을 고를 수 있어요.\n연간에서 달을 누르면 그 달의 월간 통계가, 월간에서 날짜 막대를 누르면 그날의 일간 통계가 보여요.\n통계 위쪽에서는 올해 읽을 책 수(**완독 목표**)를 정하고 진행을 볼 수 있어요.\n\n오늘 이후의 날짜와 달은 볼 수 없어요.',
     tip: '긴 필사는 4줄까지만 보여요. **더 보기**를 누르면 펼쳐져요.\n한 번에 5개씩 보이고, 넘으면 아래 번호로 넘겨 볼 수 있어요.\n완독 수는 책을 **완독**으로 바꾼 날짜를 기준으로 세요.',
   },
 ];
@@ -1026,6 +1028,56 @@ function Section({ title, summary, open, onToggle, children }) {
   );
 }
 
+// 안내 설명(사용 방법, 개인정보 안내)을 보여 줍니다.
+// 본문이 3줄 이상이면 줄마다 "-"를 붙이고, 그보다 짧으면 줄바꿈만 그대로 보여 줍니다.
+// 사용 방법은 12개 항목의 모양을 맞추려고 always를 줘서 줄 수와 상관없이 항상 "-"를 붙입니다.
+// 굵은 글씨만 있는 줄은 소제목으로, 빈 줄은 구역 사이 간격으로 보여 줍니다.
+// 줄이 길어 넘어가면 둘째 줄이 "-" 뒤에 맞춰 들여써집니다.
+const GUIDE_BULLET_MIN = 3;
+function GuideLines({ text, always = false }) {
+  const isLead = (l) => l.startsWith('> '); // 맨 위 결론 한 줄("> "로 시작): "-" 없이 굵게
+  const bodyCount = text
+    .split('\n')
+    .filter((l) => l.trim() && !isLead(l) && !/^\*\*[^*]+\*\*$/.test(l.trim())).length;
+  // 결론 줄이 있는 안내는 본문이 짧아도 같은 모양(결론 줄 + "-" 목록)으로 보여 줍니다.
+  if (!always && !text.startsWith('> ') && bodyCount < GUIDE_BULLET_MIN) {
+    return (
+      <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
+        <RichText text={text} />
+      </p>
+    );
+  }
+  return (
+    <div className="mt-1.5 space-y-1 text-sm leading-relaxed text-stone-600">
+      {text.split('\n').map((line, i) => {
+        if (!line.trim()) return <div key={i} className="h-2" />;
+        if (isLead(line)) {
+          return (
+            <p key={i} className="font-medium text-stone-800">
+              <RichText text={line.slice(2)} />
+            </p>
+          );
+        }
+        if (/^\*\*[^*]+\*\*$/.test(line.trim())) {
+          return (
+            <p key={i} className="pt-1 font-semibold text-stone-800">
+              {line.trim().slice(2, -2)}
+            </p>
+          );
+        }
+        return (
+          <p key={i} className="flex gap-1.5">
+            <span aria-hidden="true" className="text-stone-400">-</span>
+            <span className="min-w-0 flex-1">
+              <RichText text={line} />
+            </span>
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
 export function SettingsView({ data, onImport, onClearAll }) {
   const [backupMsg, setBackupMsg] = useState(null); // { ok, text }
   const importRef = useRef(null);
@@ -1038,6 +1090,46 @@ export function SettingsView({ data, onImport, onClearAll }) {
   const themeLabel = THEME_OPTIONS.find((o) => o.id === settings.theme)?.label;
   const accentLabel = ACCENT_OPTIONS.find((o) => o.id === settings.accent)?.label;
 
+  // 읽기용 문서로 내려받기: 형식은 기억해 두고, 범위는 열 때마다 "이번 달"에서 시작합니다.
+  const [docFormat, setDocFormat] = useState(() => loadCalSettings().format);
+  const [docRange, setDocRange] = useState('month'); // 'all' | 'year' | 'month' | 'pick'
+  const [docYm, setDocYm] = useState(() => {
+    const n = new Date();
+    return { y: n.getFullYear(), m: n.getMonth() };
+  });
+  const [docPicking, setDocPicking] = useState(false);
+  const markedMonths = useMemo(
+    () => new Set(data.transcriptions.map((t) => dayKey(t.created_at).slice(0, 7))),
+    [data.transcriptions]
+  );
+  const pickDocFormat = (f) => {
+    setDocFormat(f);
+    saveCalSettings({ ...loadCalSettings(), format: f });
+  };
+  const pickDocRange = (r) => {
+    setDocRange(r);
+    setDocPicking(r === 'pick');
+    if (r === 'month') {
+      const n = new Date();
+      setDocYm({ y: n.getFullYear(), m: n.getMonth() });
+    }
+  };
+  const exportDocument = () => {
+    const doc = buildReadingDocument({
+      books: data.books,
+      transcriptions: data.transcriptions,
+      range: docRange === 'pick' ? 'month' : docRange,
+      ym: docYm,
+      format: docFormat,
+    });
+    if (!doc) {
+      setBackupMsg({ ok: false, text: '내려받을 필사가 없어요.' });
+      return;
+    }
+    downloadTextFile(doc.filename, doc.text, doc.mime);
+    setBackupMsg({ ok: true, text: '읽기용 문서를 내려받았어요. 이 파일로는 기록을 되살릴 수 없어요.' });
+  };
+
   const exportBackup = () => {
     downloadTextFile(`bookandpen-backup-${fileStamp()}.json`, buildBackup(data));
     markBackup();
@@ -1047,7 +1139,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
   const clearAll = () => {
     if (
       window.confirm(
-        `책 ${data.books.length}권과 필사 ${data.transcriptions.length}개를 모두 삭제할까요? 되돌릴 수 없어요. 먼저 내보내기로 백업해 두세요.`
+        `책 ${data.books.length}권과 필사 ${data.transcriptions.length}개를 모두 삭제할까요? 되돌릴 수 없어요. 먼저 백업 내보내기로 백업해 두세요.`
       ) &&
       window.confirm('정말 모두 삭제할까요?')
     ) {
@@ -1070,7 +1162,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
     if (!/\.json$/i.test(file.name)) {
       setBackupMsg({
         ok: false,
-        text: '북앤펜 백업 파일(.json)만 가져올 수 있어요. .md나 .txt 파일은 불러올 수 없어요.',
+        text: '북앤펜 백업 파일(.json)만 가져올 수 있어요. 읽기용 문서나 필사에서 내려받은 .md, .txt 파일은 읽기용이라 불러올 수 없어요.',
       });
       return;
     }
@@ -1312,7 +1404,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
         <Note
           kind="warn"
           className=""
-          text={'브라우저 데이터를 지우면 **기록도 사라져요.**\n가끔 파일로 내려받아 두세요.'}
+          text={'브라우저 데이터를 지우면 **기록도 사라져요.**\n가끔 **백업 파일**로 내려받아 두세요.'}
         />
         <p className="mt-2 text-xs text-stone-600">
           저장 공간 {storageUsage().pct}% 사용 · 마지막 백업{' '}
@@ -1324,7 +1416,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
             disabled={data.books.length === 0}
             className="rounded-lg bg-accent py-2.5 text-sm font-medium text-on-accent disabled:bg-stone-300"
           >
-            내보내기
+            백업 내보내기
           </button>
           <button
             onClick={() => importRef.current?.click()}
@@ -1341,6 +1433,53 @@ export function SettingsView({ data, onImport, onClearAll }) {
           onChange={importBackup}
           className="hidden"
         />
+        <h3 className="mt-4 text-sm font-semibold text-stone-700">읽기용 문서로 내려받기</h3>
+        <Hint>{'날짜별로 필사와 완독한 책을 모은 문서예요.\n읽고 공유하는 용도라서, 이 파일로는 기록을 되살릴 수 없어요.'}</Hint>
+        <p className="mt-2 text-xs font-medium text-stone-600">형식</p>
+        <div className="mt-1 grid grid-cols-2 gap-2">
+          <ChoiceButton small active={docFormat === 'md'} onClick={() => pickDocFormat('md')}>마크다운</ChoiceButton>
+          <ChoiceButton small active={docFormat === 'txt'} onClick={() => pickDocFormat('txt')}>텍스트</ChoiceButton>
+        </div>
+        <p className="mt-2 text-xs font-medium text-stone-600">범위</p>
+        <div className="mt-1 grid grid-cols-4 gap-2">
+          {[['all', '전체'], ['year', '올해'], ['month', '이번 달'], ['pick', '직접 고르기']].map(([id, text]) => (
+            <ChoiceButton key={id} small active={docRange === id} onClick={() => pickDocRange(id)}>
+              {text}
+            </ChoiceButton>
+          ))}
+        </div>
+        {docRange === 'pick' && (
+          <>
+            <button
+              onClick={() => setDocPicking((v) => !v)}
+              aria-expanded={docPicking}
+              className="mt-2 w-full rounded-lg border border-stone-300 py-2 text-sm"
+            >
+              {docYm.y}년 {docYm.m + 1}월 <span className="text-xs text-stone-400">{docPicking ? '▴' : '▾'}</span>
+            </button>
+            {docPicking && (
+              <MonthPicker
+                key={`${docYm.y}-${docYm.m}`}
+                year={docYm.y}
+                month={docYm.m}
+                marked={markedMonths}
+                onPick={(y, m) => {
+                  setDocYm({ y, m });
+                  setDocPicking(false);
+                }}
+                onClose={() => setDocPicking(false)}
+                noFuture
+              />
+            )}
+          </>
+        )}
+        <button
+          onClick={exportDocument}
+          disabled={data.books.length === 0 && data.transcriptions.length === 0}
+          className="mt-3 w-full rounded-lg border border-stone-300 py-2.5 text-sm font-medium disabled:opacity-40"
+        >
+          문서로 내려받기
+        </button>
         <button
           onClick={clearAll}
           disabled={data.books.length === 0 && data.transcriptions.length === 0}
@@ -1364,9 +1503,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
           <summary className="cursor-pointer list-none text-sm font-medium [&::-webkit-details-marker]:hidden">
             개인정보 안내
           </summary>
-          <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-            <RichText text={'모든 기록은 **이 기기의 브라우저에만** 저장돼요.\n**서버로 보내는 정보가 없고**, 사진은 이 기기 안에서만 처리돼요.\n다만 앱을 열 때 글꼴(Google Fonts)을, 글자를 인식할 때 인식 엔진과 언어 데이터(jsdelivr)를 인터넷에서 내려받아요. 이때 기록이나 사진은 보내지 않지만, 해당 서비스에는 접속 기록(IP 주소 등)이 남을 수 있어요.'} />
-          </p>
+          <GuideLines text={'> 기록은 **이 기기에만** 저장되고, **서버로 보내지 않아요.**\n\n모든 기록은 **이 기기의 브라우저에만** 저장되고, 사진도 이 기기 안에서만 처리돼요.\n다만 앱을 열 때 글꼴(Google Fonts)을, 글자를 인식할 때 인식 엔진과 언어 데이터(jsdelivr)를 인터넷에서 내려받아요. 이때 기록이나 사진은 보내지 않지만, 해당 서비스에는 접속 기록(IP 주소 등)이 남을 수 있어요.'} />
           <Note kind="tip" text="최근 검색어도 이 기기에만 저장되고, 백업에는 들어가지 않아요." />
         </details>
         <details className="border-t border-stone-200 py-2">
@@ -1399,9 +1536,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
                 {g.q}
               </summary>
               {/* 설명 안의 줄바꿈(\n)을 그대로 보여 줍니다. */}
-              <p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-stone-600">
-                <RichText text={g.a} />
-              </p>
+              <GuideLines text={g.a} always />
               {g.tip && <Note kind="tip" text={g.tip} />}
               {g.warn && <Note kind="warn" text={g.warn} />}
             </details>
