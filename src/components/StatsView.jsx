@@ -48,7 +48,8 @@ export default function StatsView({ books, transcriptions }) {
     <div className="px-4 pt-6">
       <h1 className="font-body text-2xl font-bold">통계</h1>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <p className="mt-4 text-xs font-medium text-stone-500">전체 기간</p>
+      <div className="mt-1.5 grid grid-cols-3 gap-2">
         <Card label="필사" value={`${num(total)}개`} />
         <Card label="글자 수" value={`${num(chars(transcriptions))}자`} />
         <Card label="완독한 책" value={`${num(completed)}권`} />

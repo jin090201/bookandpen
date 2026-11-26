@@ -151,8 +151,9 @@ export default function BookDetail({
   };
 
   // 읽기 기간 한 줄: 첫 필사 날짜부터 시작으로 보고, 완독이면 완독일을 보여 줍니다.
+  // 필사가 없으면 줄을 만들지 않습니다(아래 "필사 노트 (0)"과 안내 카드가 이미 알려 줍니다).
   const periodText = (() => {
-    if (sorted.length === 0) return '아직 필사가 없어요.';
+    if (sorted.length === 0) return '';
     const first = sorted[sorted.length - 1].created_at;
     const parts = [`${dotDate(first)} 시작`];
     if (book.status === 'COMPLETED' && book.completed_at) {
@@ -246,7 +247,7 @@ export default function BookDetail({
           <p className="truncate text-sm text-stone-500">
             {[book.author || '저자 미입력', book.publisher].filter(Boolean).join(' · ')}
           </p>
-          <p className="mt-1 text-xs text-stone-500">{periodText}</p>
+          {periodText && <p className="mt-1 text-xs text-stone-500">{periodText}</p>}
         </div>
       )}
 
