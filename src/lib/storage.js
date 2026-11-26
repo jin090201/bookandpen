@@ -112,6 +112,12 @@ export function parseBackup(text) {
         created_at: isIso(b.created_at) ? normIso(b.created_at) : fallbackIso,
       };
       if (b.publisher !== undefined) fixed.publisher = cut(b.publisher, LIMITS.publisher); // 출판사는 없어도 됩니다 (예전 백업)
+      // 전체 페이지 수도 없어도 됩니다. 1~9999의 정수가 아니면 없는 것으로 받습니다.
+      if (b.total_pages !== undefined) {
+        const tp = cleanTotalPages(b.total_pages);
+        if (tp) fixed.total_pages = tp;
+        else delete fixed.total_pages;
+      }
       if (b.completed_at !== undefined) {
         if (isIso(b.completed_at)) fixed.completed_at = normIso(b.completed_at);
         else delete fixed.completed_at;
@@ -346,7 +352,29 @@ export function saveData(data) {
 
 // ───────────────── 입력 한도 ─────────────────
 // 필사 5,000자 / 메모 500자 / 책 제목 100자 / 저자 50자 / 사진 10MB (사진은 저장하지 않고 글자 인식에만 써요)
-export const LIMITS = { content: 5000, memo: 500, title: 100, author: 50, publisher: 50, photoMB: 10 };
+export const LIMITS = { content: 5000, memo: 500, title: 100, author: 50, publisher: 50, photoMB: 10, totalPages: 9999 };
+
+// 책의 전체 페이지 수(선택): 1~9999의 정수만 받고, 그 밖의 값은 없는 것으로 봅니다.
+export function cleanTotalPages(v) {
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 1 && n <= LIMITS.totalPages ? n : undefined;
+}
+
+// 책별 진행률. 전체 페이지 수가 없으면 null(막대를 보여 주지 않습니다).
+// 읽은 쪽은 그 책 필사에 적은 가장 큰 페이지로 봅니다. 완독은 100%, 전체보다 큰 페이지가 있으면 100%로 맞추고 over로 알립니다.
+// maxPage는 그 책 필사 중 가장 큰 페이지(없으면 0)입니다.
+export function bookProgress(book, maxPage) {
+  const total = cleanTotalPages(book.total_pages);
+  if (!total) return null;
+  const read = maxPage > 0 ? maxPage : 0;
+  const over = read > total;
+  const done = book.status === 'COMPLETED';
+  const pct = done || over ? 100 : Math.round((read / total) * 100);
+  return { total, read, pct, over, done, stopped: book.status === 'STOPPED' };
+}
+
+// 필사 목록에서 가장 큰 페이지(없으면 0)
+export const maxPageOf = (list) => list.reduce((m, t) => (t.page > m ? t.page : m), 0);
 export const countChars = (s) => [...(s || '')].length;
 // 제목·저자 입력칸: 한도의 80%를 넘으면 글자 수를 보여 줍니다.
 export const showLimitCount = (s, max) => countChars(s) >= max * 0.8;

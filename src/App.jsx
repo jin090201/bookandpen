@@ -8,6 +8,7 @@ import {
   getRemindClosedAt,
   hasCorruptCopy,
   loadData,
+  cleanTotalPages,
   mergeGoals,
   planImport,
   saveData,
@@ -174,7 +175,7 @@ export default function App() {
     setUndoList((list) => list.filter((u) => u.id !== last.id));
   };
 
-  const addBook = ({ title, author, publisher }) => {
+  const addBook = ({ title, author, publisher, totalPages }) => {
     const book = {
       book_id: uid(),
       title: title.trim(),
@@ -183,18 +184,23 @@ export default function App() {
       status: 'READING',
       created_at: new Date().toISOString(),
     };
+    const tp = cleanTotalPages(totalPages);
+    if (tp) book.total_pages = tp; // 전체 페이지 수(선택)
     setData((d) => ({ ...d, books: [book, ...d.books] }));
   };
 
   // 책 제목·저자·출판사 수정. 필사는 book_id로 이어져 있어서 제목을 바꿔도 그대로 연결됩니다.
-  const updateBookInfo = (bookId, { title, author, publisher }) => {
+  const updateBookInfo = (bookId, { title, author, publisher, totalPages }) => {
     setData((d) => ({
       ...d,
-      books: d.books.map((b) =>
-        b.book_id === bookId
-          ? { ...b, title: title.trim(), author: author.trim(), publisher: (publisher || '').trim() }
-          : b
-      ),
+      books: d.books.map((b) => {
+        if (b.book_id !== bookId) return b;
+        const next = { ...b, title: title.trim(), author: author.trim(), publisher: (publisher || '').trim() };
+        const tp = cleanTotalPages(totalPages);
+        if (tp) next.total_pages = tp;
+        else delete next.total_pages; // 비우면 전체 페이지 수를 없앱니다
+        return next;
+      }),
     }));
   };
 

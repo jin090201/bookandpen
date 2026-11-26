@@ -3,6 +3,7 @@ import Chip from './Chip.jsx';
 import EmptyState from './EmptyState.jsx';
 import Note, { DOUBT_WARNING, RichText } from './Note.jsx';
 import Pager, { usePaging } from './Pager.jsx';
+import ProgressBar from './ProgressBar.jsx';
 import SearchView, { Highlight, buildPattern, findTranscriptions } from './SearchView.jsx';
 import { MonthPicker, loadCalSettings, saveCalSettings } from './CalendarView.jsx';
 import { buildReadingDocument } from '../lib/calendarExport.js';
@@ -30,6 +31,7 @@ import {
   getLastBackup,
   loadRecentSearches,
   markBackup,
+  bookProgress,
   pageText,
   parseBackup,
   planImport,
@@ -121,6 +123,7 @@ export default function BookList({
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [publisher, setPublisher] = useState('');
+  const [totalPages, setTotalPages] = useState(''); // 전체 페이지 수(선택, 숫자만)
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState('ALL');
   const [sort, setSort] = useState('recent');
@@ -164,10 +167,11 @@ export default function BookList({
     ) {
       return;
     }
-    onAdd({ title, author, publisher });
+    onAdd({ title, author, publisher, totalPages });
     setTitle('');
     setAuthor('');
     setPublisher('');
+    setTotalPages('');
     setShowForm(false);
   };
 
@@ -175,8 +179,9 @@ export default function BookList({
   const stats = useMemo(() => {
     const m = {};
     for (const t of transcriptions) {
-      const s = m[t.book_id] || (m[t.book_id] = { count: 0, last: '' });
+      const s = m[t.book_id] || (m[t.book_id] = { count: 0, last: '', maxPage: 0 });
       s.count += 1;
+      if (t.page > s.maxPage) s.maxPage = t.page;
       if (t.created_at > s.last) s.last = t.created_at;
     }
     return m;
@@ -350,6 +355,14 @@ export default function BookList({
               {countChars(publisher)} / {LIMITS.publisher}자
             </p>
           )}
+          <input
+            value={totalPages}
+            onChange={(e) => setTotalPages(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            placeholder="전체 페이지 수 (선택, 진행률 막대에 써요)"
+            inputMode="numeric"
+            aria-label="전체 페이지 수"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 outline-none focus:border-stone-500"
+          />
           <button
             type="submit"
             disabled={!title.trim()}
@@ -614,6 +627,10 @@ export default function BookList({
                           : '필사 없음'}
                       </span>
                     </div>
+                    {(() => {
+                      const pg = bookProgress(b, s?.maxPage || 0);
+                      return pg ? <ProgressBar progress={pg} slim /> : null;
+                    })()}
                   </div>
                 </button>
               </li>

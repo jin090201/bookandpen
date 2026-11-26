@@ -3,6 +3,7 @@ import { STATUS_LABEL } from './BookList.jsx';
 import Chip from './Chip.jsx';
 import EmptyState from './EmptyState.jsx';
 import Pager, { usePaging } from './Pager.jsx';
+import ProgressBar from './ProgressBar.jsx';
 import { dotDate, fileStamp } from '../lib/date.js';
 import {
   KIND_LABEL,
@@ -12,6 +13,8 @@ import {
   filterByKind,
   kindText,
   pageText,
+  bookProgress,
+  maxPageOf,
   buildMarkdown,
   buildPlainText,
   safeFilename,
@@ -62,6 +65,7 @@ export default function BookDetail({
   const [titleDraft, setTitleDraft] = useState('');
   const [authorDraft, setAuthorDraft] = useState('');
   const [publisherDraft, setPublisherDraft] = useState('');
+  const [totalPagesDraft, setTotalPagesDraft] = useState(''); // 전체 페이지 수(숫자만)
   const [copied, setCopied] = useState(null); // { id, ok }
   const [expanded, setExpanded] = useState(() => new Set()); // 펼친 필사 id
   const [kindFilter, setKindFilter] = useState('all'); // all | quote | mine | none
@@ -181,7 +185,12 @@ export default function BookDetail({
           onSubmit={(e) => {
             e.preventDefault();
             if (!titleDraft.trim()) return;
-            onUpdateInfo({ title: titleDraft, author: authorDraft, publisher: publisherDraft });
+            onUpdateInfo({
+              title: titleDraft,
+              author: authorDraft,
+              publisher: publisherDraft,
+              totalPages: totalPagesDraft,
+            });
             setInfoEditing(false);
           }}
         >
@@ -224,6 +233,14 @@ export default function BookDetail({
               {countChars(publisherDraft)} / {LIMITS.publisher}자
             </p>
           )}
+          <input
+            value={totalPagesDraft}
+            onChange={(e) => setTotalPagesDraft(e.target.value.replace(/\D/g, '').slice(0, 4))}
+            placeholder="전체 페이지 수 (선택, 진행률 막대에 써요)"
+            aria-label="전체 페이지 수"
+            inputMode="numeric"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-base outline-none focus:border-stone-500"
+          />
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -248,6 +265,10 @@ export default function BookDetail({
             {[book.author || '저자 미입력', book.publisher].filter(Boolean).join(' · ')}
           </p>
           {periodText && <p className="mt-1 text-xs text-stone-500">{periodText}</p>}
+          {(() => {
+            const pg = bookProgress(book, maxPageOf(transcriptions));
+            return pg ? <ProgressBar progress={pg} /> : null;
+          })()}
         </div>
       )}
 
@@ -281,6 +302,7 @@ export default function BookDetail({
               setTitleDraft(book.title);
               setAuthorDraft(book.author || '');
               setPublisherDraft(book.publisher || '');
+              setTotalPagesDraft(book.total_pages ? String(book.total_pages) : '');
               setInfoEditing(true);
             }}
             className="flex w-full items-center justify-between px-4 py-3 text-left"
