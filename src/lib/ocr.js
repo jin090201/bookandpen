@@ -4,19 +4,28 @@ import { createWorker } from 'tesseract.js';
 // 최초 1회 언어 데이터를 내려받고 이후에는 브라우저 캐시를 사용합니다.
 let workerPromise = null;
 let currentProgress = null;
+let activeCancel = null; // 지금 진행 중인 인식을 멈추는 함수(없으면 null)
 
 function getWorker() {
   if (!workerPromise) {
-    workerPromise = createWorker('kor+eng', 1, {
+    const p = createWorker('kor+eng', 1, {
       logger: (m) => {
         if (currentProgress) currentProgress(m);
       },
     }).catch((err) => {
-      workerPromise = null; // 실패 시 다음 시도에서 재생성
+      // 실패하면 다음 시도에서 다시 만듭니다. 그 사이 새로 만든 워커를 지우지 않도록 내 것일 때만 비웁니다.
+      if (workerPromise === p) workerPromise = null;
       throw err;
     });
+    workerPromise = p;
   }
   return workerPromise;
+}
+
+// 진행 중인 인식을 멈춥니다. 엔진(워커)을 끄므로 바로 멈추고, 다음 인식 때 엔진을 새로 켭니다(언어 데이터는 캐시를 씁니다).
+// 진행 중인 인식이 없으면 아무 일도 하지 않습니다. 멈춘 인식은 code가 'CANCELLED'인 오류로 끝납니다.
+export function cancelRecognition() {
+  if (activeCancel) activeCancel();
 }
 
 // 흑백으로 바꾸고 밝기 범위를 늘립니다. 종이 뒷면의 비친 글자나 옅은 그림자처럼 본문보다 옅은 부분이 배경에 가까워집니다.
@@ -140,18 +149,45 @@ const DOUBT_BELOW = 70;
  */
 export async function recognizeImage(file, onProgress, crop = null) {
   currentProgress = onProgress;
+
+  // 취소 처리: 멈추면 이 약속이 'CANCELLED' 오류로 끝나서, 기다리던 단계를 모두 빠져나옵니다.
+  let cancelled = false;
+  let workerUsed = false; // 엔진을 쓰기 시작한 뒤에만 엔진을 끕니다(사진 준비 중에 취소하면 엔진은 그대로 둠)
+  let rejectCancelled;
+  const cancelledSignal = new Promise((_, reject) => {
+    rejectCancelled = reject;
+  });
+  cancelledSignal.catch(() => {}); // 취소하지 않았을 때 처리되지 않은 오류로 남지 않게 합니다.
+  const myCancel = () => {
+    if (cancelled) return;
+    cancelled = true;
+    if (workerUsed && workerPromise) {
+      const p = workerPromise;
+      workerPromise = null; // 다음 인식은 새 엔진으로 시작합니다.
+      p.then((w) => w.terminate()).catch(() => {}); // 아직 만드는 중이었다면 다 만든 뒤 바로 끕니다.
+    }
+    const err = new Error('인식 취소');
+    err.code = 'CANCELLED';
+    rejectCancelled(err);
+  };
+  activeCancel = myCancel;
+
   try {
     let blob;
     try {
-      blob = await prepareImage(file, crop);
-    } catch {
+      blob = await Promise.race([prepareImage(file, crop), cancelledSignal]);
+    } catch (e) {
+      if (e?.code === 'CANCELLED') throw e;
       // 사진을 열 수 없는 경우를 네트워크 오류와 구분하려고 표시를 붙입니다.
       const err = new Error('이미지 변환 실패');
       err.code = 'IMAGE';
       throw err;
     }
-    const worker = await getWorker();
-    const { data } = await worker.recognize(blob);
+    workerUsed = true;
+    const worker = await Promise.race([getWorker(), cancelledSignal]);
+    const job = worker.recognize(blob);
+    job.catch(() => {}); // 엔진을 끄면 이 작업이 오류로 끝날 수 있어, 취소 때 처리되지 않은 오류로 남지 않게 합니다.
+    const { data } = await Promise.race([job, cancelledSignal]);
     const doubtful = [];
     for (const w of data.words || []) {
       const t = (w.text || '').trim();
@@ -162,7 +198,8 @@ export async function recognizeImage(file, onProgress, crop = null) {
     }
     return { text: data.text || '', doubtful };
   } finally {
-    // 그 사이 다른 인식이 시작됐다면 그쪽의 진행 표시를 지우지 않습니다.
+    // 그 사이 다른 인식이 시작됐다면 그쪽의 진행 표시와 취소 함수를 지우지 않습니다.
     if (currentProgress === onProgress) currentProgress = null;
+    if (activeCancel === myCancel) activeCancel = null;
   }
 }

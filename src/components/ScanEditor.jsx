@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { recognizeImage, makePreview } from '../lib/ocr.js';
+import { recognizeImage, makePreview, cancelRecognition } from '../lib/ocr.js';
 import { postprocess } from '../lib/postprocess.js';
 import Chip from './Chip.jsx';
 import Note, { DOUBT_WARNING } from './Note.jsx';
@@ -52,10 +52,16 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
   // 오류 문장 아래에 보여 줄 버튼: 'type'(직접 입력하기) · 'both'(다시 고르기 + 직접 입력하기) · ''(없음)
   const [errorBtns, setErrorBtns] = useState('');
   const lastFileRef = useRef(null); // 마지막으로 고른 사진("다시 고르기"에서 자르기 화면을 다시 엽니다)
-  const fail = (text, btns = '') => {
+  // soft가 true이면 빨간 글씨 대신 연한 회색으로 보여 줍니다(오류가 아니라 사용자가 멈춘 경우).
+  const [errorSoft, setErrorSoft] = useState(false);
+  const fail = (text, btns = '', soft = false) => {
     setError(text);
     setErrorBtns(btns);
+    setErrorSoft(soft);
   };
+
+  // 화면을 나가면(취소·첫 화면·뒤로가기) 진행 중인 인식도 함께 멈춰, 뒤에서 계속 돌지 않게 합니다.
+  useEffect(() => () => cancelRecognition(), []);
 
   const [rawText, setRawText] = useState('');
   const [content, setContent] = useState(editing?.content ?? '');
@@ -175,6 +181,11 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
       });
       setContent((prev) => (appended && prev.trim() ? prev.trim() + '\n\n' + cleaned : cleaned));
     } catch (err) {
+      if (err?.code === 'CANCELLED') {
+        // 사용자가 멈춘 것이므로 오류 기록은 남기지 않고, 적어 둔 내용은 그대로 둡니다.
+        fail('인식을 취소했어요.', 'both', true);
+        return;
+      }
       console.error(err);
       fail(
         err?.code === 'IMAGE'
@@ -334,7 +345,15 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
 
       {busy && (
         <div className="mt-3">
-          <p className="text-sm text-stone-600">{statusText}</p>
+          <div className="flex items-center justify-between gap-2">
+            <p className="min-w-0 text-sm text-stone-600">{statusText}</p>
+            <button
+              onClick={cancelRecognition}
+              className="shrink-0 rounded-lg border border-stone-300 bg-white px-3 py-1 text-sm font-medium"
+            >
+              인식 취소
+            </button>
+          </div>
           <div className="mt-1 h-2 overflow-hidden rounded-full bg-stone-200">
             <div
               className="h-full bg-accent transition-all"
@@ -346,7 +365,7 @@ export default function ScanEditor({ book, editing, onCancel, onHome, onSave, le
 
       {error && (
         <div className="mt-3">
-          <p className="whitespace-pre-line text-sm text-red-600">{error}</p>
+          <p className={`whitespace-pre-line text-sm ${errorSoft ? 'text-stone-600' : 'text-red-600'}`}>{error}</p>
           {errorBtns && (
             <div className="mt-2 flex gap-2">
               {errorBtns === 'both' && lastFileRef.current && (
