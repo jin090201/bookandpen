@@ -327,7 +327,7 @@ function MonthStats({ books, transcriptions, cur, setCur, onOpenDay }) {
           </span>
         ))}
       </div>
-      <p className="mt-2 text-center text-xs text-stone-400">날짜별 필사 개수 · 막대를 누르면 일간 통계로 가요.</p>
+      <p className="mt-2 text-center text-xs text-stone-400">막대 하나는 하루예요. 누르면 일간 통계로 이동해요.</p>
       </div>
     </div>
   );
@@ -492,7 +492,7 @@ function YearStats({ books, transcriptions, onOpenMonth }) {
           </button>
         ))}
       </div>
-      <p className="mt-2 text-center text-xs text-stone-400">월별 필사 개수 · 달을 누르면 월간 통계로 가요.</p>
+      <p className="mt-2 text-center text-xs text-stone-400">막대 하나는 한 달이에요. 누르면 월간 통계로 이동해요.</p>
       </div>
     </div>
   );
