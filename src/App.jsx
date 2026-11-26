@@ -9,6 +9,7 @@ import {
   hasCorruptCopy,
   loadData,
   mergeGoals,
+  planImport,
   saveData,
   storageUsage,
   uid,
@@ -292,14 +293,9 @@ export default function App() {
   };
 
   // 가져오기: 기존 기록은 지우지 않고, 없는 항목만 합침(같은 id는 건너뜀)
-  const importBackup = ({ books, transcriptions, goals }) => {
-    const bookIds = new Set(data.books.map((b) => b.book_id));
-    const tIds = new Set(data.transcriptions.map((t) => t.transcription_id));
-    const newBooks = books.filter((b) => !bookIds.has(b.book_id));
-    const allBookIds = new Set([...bookIds, ...newBooks.map((b) => b.book_id)]);
-    const newTs = transcriptions.filter(
-      (t) => !tIds.has(t.transcription_id) && allBookIds.has(t.book_id)
-    );
+  const importBackup = (parsed) => {
+    const { newBooks, newTs } = planImport(data, parsed);
+    const { goals } = parsed;
     setData((d) => ({
       books: [...newBooks, ...d.books],
       transcriptions: [...newTs, ...d.transcriptions],

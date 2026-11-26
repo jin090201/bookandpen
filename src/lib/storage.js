@@ -144,8 +144,33 @@ export function parseBackup(text) {
       } else if (t.kinds !== undefined) delete fixed.kinds;
       return fixed;
     });
-  // 목표는 예전 백업에는 없으므로 없어도 됩니다.
-  return { books, transcriptions, goals: cleanGoals(parsed.goals) };
+  // 목표는 예전 백업에는 없으므로 없어도 됩니다. 백업을 만든 시각(exportedAt)은 없을 수 있어 null로 둡니다.
+  return {
+    books,
+    transcriptions,
+    goals: cleanGoals(parsed.goals),
+    exportedAt: isIso(parsed.exported_at) ? normIso(parsed.exported_at) : null,
+  };
+}
+
+// 가져오기 계획: 가져오면 무엇이 새로 들어오고 무엇을 건너뛰는지 셉니다(기록은 바꾸지 않습니다).
+// 미리보기와 실제 가져오기가 같은 규칙을 쓰도록 한 곳에서 정합니다.
+// 같은 id는 건너뛰고, 책이 없는 필사도 건너뜁니다. 이미 목표가 있는 해의 목표도 건너뜁니다.
+export function planImport(data, { books, transcriptions, goals }) {
+  const bookIds = new Set(data.books.map((b) => b.book_id));
+  const tIds = new Set(data.transcriptions.map((t) => t.transcription_id));
+  const newBooks = books.filter((b) => !bookIds.has(b.book_id));
+  const allBookIds = new Set([...bookIds, ...newBooks.map((b) => b.book_id)]);
+  const newTs = transcriptions.filter((t) => !tIds.has(t.transcription_id) && allBookIds.has(t.book_id));
+  const have = loadGoals();
+  const newGoals = Object.keys(cleanGoals(goals)).filter((y) => have[y] === undefined).length;
+  return {
+    newBooks,
+    newTs,
+    newGoals,
+    skippedBooks: books.length - newBooks.length,
+    skippedTs: transcriptions.length - newTs.length,
+  };
 }
 
 // ───────────────── 올해 완독 목표 (연도별 권수, 백업에 포함) ─────────────────

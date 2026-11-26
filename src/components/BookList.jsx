@@ -32,6 +32,7 @@ import {
   markBackup,
   pageText,
   parseBackup,
+  planImport,
   removeRecentSearch,
   showLimitCount,
   storageUsage,
@@ -1151,6 +1152,7 @@ function GuideLines({ text, always = false }) {
 
 export function SettingsView({ data, onImport, onClearAll }) {
   const [backupMsg, setBackupMsg] = useState(null); // { ok, text }
+  const [pending, setPending] = useState(null); // 가져오기 확인 대기 { name, parsed, plan }
   const importRef = useRef(null);
   const settings = useSettings();
   const change = (patch) => updateSettings(patch); // 저장 + 바로 적용
@@ -1256,9 +1258,26 @@ export function SettingsView({ data, onImport, onClearAll }) {
       });
       return;
     }
+    // 파일을 읽고 검증만 먼저 합니다. 기록은 "가져오기"를 눌러야 바뀝니다.
+    setPending(null);
     try {
       const parsed = parseBackup(await file.text());
-      const added = onImport(parsed);
+      const plan = planImport(data, parsed);
+      if (plan.newBooks.length === 0 && plan.newTs.length === 0 && plan.newGoals === 0) {
+        setBackupMsg({ ok: false, text: '가져올 새 기록이 없어요. 이 파일의 기록은 모두 이미 있어요.' });
+        return;
+      }
+      setBackupMsg(null);
+      setPending({ name: file.name, parsed, plan });
+    } catch (err) {
+      setBackupMsg({ ok: false, text: err.message });
+    }
+  };
+
+  const confirmImport = () => {
+    if (!pending) return;
+    try {
+      const added = onImport(pending.parsed);
       setBackupMsg({
         ok: true,
         text: `책 ${added.books}권, 필사 ${added.transcriptions}개${
@@ -1268,6 +1287,7 @@ export function SettingsView({ data, onImport, onClearAll }) {
     } catch (err) {
       setBackupMsg({ ok: false, text: err.message });
     }
+    setPending(null);
   };
 
   return (
@@ -1523,6 +1543,39 @@ export function SettingsView({ data, onImport, onClearAll }) {
           onChange={importBackup}
           className="hidden"
         />
+        {pending && (
+          <div className="mt-3 rounded-xl border border-stone-200 bg-white px-3 py-3">
+            <p className="text-sm font-medium text-stone-700">이 파일을 가져올까요?</p>
+            <p className="mt-1 break-all text-xs text-stone-500">{pending.name}</p>
+            <p className="text-xs text-stone-500">
+              백업을 만든 날 {pending.parsed.exportedAt ? dotDate(pending.parsed.exportedAt) : '알 수 없어요'}
+            </p>
+            <p className="mt-3 text-xs font-medium text-stone-600">새로 들어와요</p>
+            <p className="text-sm text-stone-700">
+              책 {pending.plan.newBooks.length}권 · 필사 {pending.plan.newTs.length}개
+              {pending.plan.newGoals > 0 ? ` · 목표 ${pending.plan.newGoals}개` : ''}
+            </p>
+            <p className="mt-2 text-xs font-medium text-stone-600">이미 있어서 건너뛰어요</p>
+            <p className="text-sm text-stone-700">
+              책 {pending.plan.skippedBooks}권 · 필사 {pending.plan.skippedTs}개
+            </p>
+            <Hint>가져와도 지금 있는 기록은 바뀌거나 지워지지 않아요.</Hint>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={confirmImport}
+                className="rounded-lg bg-accent py-2.5 text-sm font-medium text-on-accent"
+              >
+                가져오기
+              </button>
+              <button
+                onClick={() => setPending(null)}
+                className="rounded-lg border border-stone-300 py-2.5 text-sm font-medium"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
         <h3 className="mt-4 text-sm font-semibold text-stone-700">읽기용 문서로 내려받기</h3>
         <Hint>{'날짜별로 필사와 완독한 책을 모은 문서예요.\n읽고 공유하는 용도라서, 이 파일로는 기록을 되살릴 수 없어요.'}</Hint>
         <p className="mt-2 text-xs font-medium text-stone-600">형식</p>
