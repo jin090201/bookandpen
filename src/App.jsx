@@ -41,7 +41,8 @@ export default function App() {
   const [usage, setUsage] = useState(storageUsage);
   const [lastBackup, setLastBackup] = useState(getLastBackup);
   const [remindClosedAt, setRemindClosedAt] = useState(getRemindClosedAt);
-  const [undo, setUndo] = useState(null); // { label, removed: { books, transcriptions } }
+  // 되돌릴 수 있는 삭제 목록(오래된 것이 앞): [{ id, label, removed: { books, transcriptions }, expiresAt }]
+  const [undoList, setUndoList] = useState([]);
   // 저장된 데이터를 읽지 못해 원본을 따로 보관했는지 (처음 열 때 한 번 확인)
   const [corruptNotice, setCorruptNotice] = useState(hasCorruptCopy);
 
@@ -132,22 +133,32 @@ export default function App() {
     return () => window.removeEventListener(BACKUP_EVENT, onBackup);
   }, []);
 
-  // 삭제 취소 안내는 10초 뒤에 사라집니다
+  // 삭제한 항목은 삭제한 때부터 10초 동안 되돌릴 수 있고(항목마다 따로 셈), 최대 5개까지 쌓아 둡니다.
+  const UNDO_MS = 10000;
+  const UNDO_LIMIT = 5;
   useEffect(() => {
-    if (!undo) return undefined;
-    const timer = setTimeout(() => setUndo(null), 10000);
+    if (undoList.length === 0) return undefined;
+    const soonest = Math.min(...undoList.map((u) => u.expiresAt));
+    const timer = setTimeout(() => {
+      const now = Date.now();
+      setUndoList((list) => list.filter((u) => u.expiresAt > now));
+    }, Math.max(0, soonest - Date.now()) + 20);
     return () => clearTimeout(timer);
-  }, [undo]);
+  }, [undoList]);
 
   // 삭제한 항목을 기억해 두었다가 되돌리기 (그 사이 바뀐 다른 기록은 건드리지 않아요)
   const offerUndo = (label, removed) => {
     if (removed.books.length + removed.transcriptions.length === 0) return;
-    setUndo({ label, removed });
+    setUndoList((list) =>
+      [...list, { id: uid(), label, removed, expiresAt: Date.now() + UNDO_MS }].slice(-UNDO_LIMIT)
+    );
   };
 
+  // "되돌리기"를 누르면 가장 최근에 삭제한 것부터 한 개씩 되돌립니다.
   const undoDelete = () => {
-    if (!undo) return;
-    const { removed } = undo;
+    const last = undoList[undoList.length - 1];
+    if (!last) return;
+    const { removed } = last;
     setData((d) => {
       const bookIds = new Set(d.books.map((b) => b.book_id));
       const tIds = new Set(d.transcriptions.map((t) => t.transcription_id));
@@ -159,7 +170,7 @@ export default function App() {
         ],
       };
     });
-    setUndo(null);
+    setUndoList((list) => list.filter((u) => u.id !== last.id));
   };
 
   const addBook = ({ title, author, publisher }) => {
@@ -347,10 +358,13 @@ export default function App() {
         );
       })()}
 
-      {undo && (
+      {undoList.length > 0 && (
         <div className="fixed inset-x-0 bottom-28 z-20 mx-auto max-w-md px-4">
-          <div className="flex items-center justify-between rounded-xl bg-stone-800 px-4 py-3 text-sm text-white shadow-lg">
-            <span>{undo.label}</span>
+          <div className="flex items-center justify-between gap-3 rounded-xl bg-stone-800 px-4 py-3 text-sm text-white shadow-lg">
+            <span>
+              {undoList[undoList.length - 1].label}
+              {undoList.length > 1 ? ` · 삭제 ${undoList.length}건` : ''}
+            </span>
             <button onClick={undoDelete} className="font-semibold text-amber-300">
               되돌리기
             </button>
@@ -413,7 +427,10 @@ export default function App() {
         <SettingsView
           data={data}
           onImport={importBackup}
-          onClearAll={() => setData((d) => ({ ...d, books: [], transcriptions: [] }))}
+          onClearAll={() => {
+            setData((d) => ({ ...d, books: [], transcriptions: [] }));
+            setUndoList([]); // 모든 기록 삭제는 되돌릴 수 없으니, 앞서 삭제한 것의 되돌리기도 함께 지웁니다.
+          }}
         />
       )}
 
