@@ -1173,13 +1173,32 @@ export function SettingsView({ data, onImport, onClearAll }) {
       setBackupMsg({ ok: false, text: '내려받을 필사가 없어요.' });
       return;
     }
-    downloadTextFile(doc.filename, doc.text, doc.mime);
+    if (!downloadTextFile(doc.filename, doc.text, doc.mime)) {
+      setBackupMsg({ ok: false, text: '문서를 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.' });
+      return;
+    }
     setBackupMsg({ ok: true, text: '읽기용 문서를 내려받았어요. 이 파일로는 기록을 되살릴 수 없어요.' });
   };
 
+  // 파일 만들기와 내려받기 시작에 오류가 없었을 때만 "마지막 백업" 시각을 기록합니다.
   const exportBackup = () => {
-    downloadTextFile(`bookandpen-backup-${fileStamp()}.json`, buildBackup(data));
-    markBackup();
+    let text;
+    try {
+      text = buildBackup(data);
+    } catch {
+      text = null;
+    }
+    if (text === null || !downloadTextFile(`bookandpen-backup-${fileStamp()}.json`, text)) {
+      setBackupMsg({ ok: false, text: '백업 파일을 만들지 못했어요. 잠시 뒤 다시 시도해 주세요.' });
+      return;
+    }
+    if (!markBackup()) {
+      setBackupMsg({
+        ok: true,
+        text: '백업 파일을 내려받았어요. 다만 백업한 시각은 저장하지 못했어요.',
+      });
+      return;
+    }
     setBackupMsg({ ok: true, text: '백업 파일을 내려받았어요.' });
   };
 

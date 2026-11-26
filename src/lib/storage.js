@@ -284,16 +284,23 @@ export function safeFilename(name) {
   return name.replace(/[\\/:*?"<>|]/g, '').trim() || '북앤펜';
 }
 
+// 파일 만들기와 내려받기 시작에 오류가 없었으면 true, 있었으면 false를 돌려줍니다.
+// 브라우저가 파일을 실제로 저장했는지는 웹에서 알 수 없으므로, true는 "내려받기를 시작했다"는 뜻입니다.
 export function downloadTextFile(filename, text, mime = 'application/json') {
-  const blob = new Blob([text], { type: `${mime};charset=utf-8` });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  try {
+    const blob = new Blob([text], { type: `${mime};charset=utf-8` });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // 저장 성공 여부를 반환 (용량 초과 등 실패 시 false)
@@ -345,13 +352,16 @@ export function getLastBackup() {
   }
 }
 
+// 마지막 백업 시각을 기록합니다. 저장에 성공하면 true, 실패하면(저장 공간 부족 등) false를 돌려줍니다.
+// 시각이 바뀐 것을 알리는 이벤트는 저장에 성공했을 때만 보냅니다.
 export function markBackup() {
   try {
     localStorage.setItem(BACKUP_KEY, new Date().toISOString());
   } catch {
-    /* 저장 실패는 무시 */
+    return false;
   }
   window.dispatchEvent(new Event(BACKUP_EVENT));
+  return true;
 }
 
 export function getRemindClosedAt() {
