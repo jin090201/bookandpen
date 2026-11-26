@@ -90,7 +90,10 @@ export function parseBackup(text) {
     const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
     return mo >= 1 && mo <= 12 && d >= 1 && d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
   };
-  const fallbackIso = isIso(parsed.exported_at) ? parsed.exported_at : new Date().toISOString();
+  // 받은 시각은 앱이 만드는 형식(UTC, 예: 2026-11-25T03:00:00.000Z)으로 맞춥니다.
+  // 형식이 섞이면(+09:00처럼 시간대가 붙은 값, 밀리초가 없는 값) 글자 비교로 하는 정렬이 실제 시각 순서와 어긋나기 때문입니다.
+  const normIso = (v) => new Date(v).toISOString();
+  const fallbackIso = isIso(parsed.exported_at) ? normIso(parsed.exported_at) : new Date().toISOString();
   const cut = (v, max) => (typeof v === 'string' ? [...v].slice(0, max).join('') : '');
   const STATUSES = ['WISH', 'READING', 'COMPLETED', 'STOPPED'];
 
@@ -106,10 +109,13 @@ export function parseBackup(text) {
         title: cut(b.title, LIMITS.title),
         author: cut(b.author, LIMITS.author),
         status: STATUSES.includes(b.status) ? b.status : 'READING',
-        created_at: isIso(b.created_at) ? b.created_at : fallbackIso,
+        created_at: isIso(b.created_at) ? normIso(b.created_at) : fallbackIso,
       };
       if (b.publisher !== undefined) fixed.publisher = cut(b.publisher, LIMITS.publisher); // 출판사는 없어도 됩니다 (예전 백업)
-      if (b.completed_at !== undefined && !isIso(b.completed_at)) delete fixed.completed_at;
+      if (b.completed_at !== undefined) {
+        if (isIso(b.completed_at)) fixed.completed_at = normIso(b.completed_at);
+        else delete fixed.completed_at;
+      }
       return fixed;
     });
   const transcriptions = parsed.transcriptions
@@ -129,7 +135,7 @@ export function parseBackup(text) {
         page: Number.isInteger(pageNum) && pageNum > 0 ? pageNum : null,
         memo: cut(t.memo, LIMITS.memo),
         favorite: t.favorite === true,
-        created_at: isIso(t.created_at) ? t.created_at : fallbackIso,
+        created_at: isIso(t.created_at) ? normIso(t.created_at) : fallbackIso,
       };
       // 종류는 알려진 값(책 문장·내 글)만 남기고 겹치는 값은 하나로 합칩니다. 배열이 아니면 없는 것으로 봅니다.
       if (Array.isArray(t.kinds)) {

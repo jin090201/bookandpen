@@ -94,8 +94,10 @@ function shortDate(iso) {
   return full.slice(0, 4) === String(new Date().getFullYear()) ? full.slice(5) : full;
 }
 
+// "오늘 / N일 전": 달력·통계와 같은 날짜(dayKey, 기기의 날짜) 기준으로 셉니다.
+// (24시간이 지났는지로 세면 밤늦게 쓴 필사가 다음 날 새벽까지 "오늘"로 남아 달력과 하루 어긋납니다.)
 function daysAgo(iso) {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / DAY);
+  const d = Math.round((new Date(dayKey(new Date())) - new Date(dayKey(iso))) / DAY);
   return d <= 0 ? '오늘' : `${d}일 전`;
 }
 
@@ -139,6 +141,28 @@ export default function BookList({
   const submit = (e) => {
     e.preventDefault();
     if (!title.trim()) return;
+    // 제목과 저자가 같은 책이 이미 있으면 확인합니다(재독·다른 판본은 허용).
+    // 저자가 비어 있는 쪽이 있으면 저자를 알 수 없으므로 제목만 같아도 확인합니다.
+    // 저자는 한쪽이 다른 쪽을 포함해도("헤르만"과 "헤르만 헤세") 같은 저자로 봅니다.
+    const norm = (s) => (s || '').trim().toLowerCase();
+    const same = (a, b) => norm(a) === norm(b);
+    // 출판사는 두 책 모두 있고 서로 다르면 다른 판본으로 봅니다(비어 있으면 모르므로 같은 것으로 봅니다).
+    const similar = (a, b) => {
+      const x = norm(a);
+      const y = norm(b);
+      return !x || !y || x.includes(y) || y.includes(x);
+    };
+    if (
+      books.some(
+        (b) =>
+          same(b.title, title) &&
+          similar(b.author, author) &&
+          similar(b.publisher, publisher)
+      ) &&
+      !window.confirm('같은 책이 이미 있어요. 그래도 추가할까요?')
+    ) {
+      return;
+    }
     onAdd({ title, author, publisher });
     setTitle('');
     setAuthor('');
